@@ -1,0 +1,1 @@
+# vivaldi-mods-manager
