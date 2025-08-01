@@ -1,0 +1,27 @@
+/* Credit to quodroc for this mod */
+/* https://forum.vivaldi.net/topic/96266/vertical-extensions-drop-down-menu */
+
+/* Vertical Extensions Drop-Down Menu */
+.extensionIconPopupMenu {
+  --popupWidth: 280px !important;
+}
+.extensionIconPopupMenu > .toolbar {
+  max-height: 50vh;
+  overflow: hidden auto;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.extensionIconPopupMenu .ExtensionDropdownIcon > button {
+  justify-content: flex-start;
+  padding: 8px 10px;
+}
+.extensionIconPopupMenu .ExtensionDropdownIcon > button::after {
+  content: attr(title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.extensionIconPopupMenu .ExtensionDropdownIcon .button-badge {
+  top: auto;
+  right: 10px;
+}
