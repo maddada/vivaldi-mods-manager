@@ -82,3 +82,5 @@ Special thanks to the Vivaldi modding community:
 And huge thanks to **Vivaldi** for creating the most customizable browser and supporting the modding community!
 
 Please consider donating to the Vivaldi team if you like their work (recurring donations are even better): https://vivaldi.com/donate/
+
+License: MIT
