@@ -1,17 +1,22 @@
 (function () {
     ("use strict");
 
-    // Use configurable settings
+    // Settings that you can configure:
+    const userConfig = {
+        expandDelay: 20, // time to wait before expanding the panel when mouse enters
+        collapseDelay: 200, // time to wait before collapsing the panel when mouse leaves
+        transitionAnimation: "0.09s linear", // animation speed for the panel
+    };
+
+    // These shouldn't be changed unless you know what you're doing
     const config = {
+        ...userConfig,
+        reinitInterval: 5000,
+        initCheckInterval: 800,
         hiddenWidth: "34px",
         minimizedWidth: "72px",
         expandedWidth: "260px",
         fullWidth: "300px",
-        expandDelay: 20, // ms
-        collapseDelay: 200, // ms
-        initCheckInterval: 800, // ms
-        reinitInterval: 5000, // ms
-        transitionAnimation: "0.05s linear", // ms
     };
 
     function isBookmarksBarEnabled() {
@@ -572,7 +577,7 @@
             console.log("[initializeManager] Manager initialized successfully, clearing init interval");
             clearInterval(initInterval);
 
-            // Set up periodic reinitialization to handle page changes
+            // Set up periodic reinitialization check to handle sidepanel
             setInterval(() => {
                 init();
             }, config.reinitInterval);
