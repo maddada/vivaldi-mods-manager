@@ -5,7 +5,7 @@
     const userConfig = {
         expandDelay: 20, // time to wait before expanding the panel when mouse enters
         collapseDelay: 200, // time to wait before collapsing the panel when mouse leaves
-        transitionAnimation: "0.09s linear", // animation speed for the panel
+        transitionAnimation: "0.09s ease-in-out", // animation speed for the panel
     };
 
     // These shouldn't be changed unless you know what you're doing
@@ -39,6 +39,7 @@
     // Sidepanel state management
     let currentState = SIDEPANEL_STATES.OVERLAY;
     let previousState = null;
+    let transitionGracePeriod = false;
 
     let buttonClicked = false;
     let alreadyRanReactToPanelContainerWidthModification = false;
@@ -100,6 +101,15 @@
 
     // === STATE MANAGEMENT ===
     function setState(newState) {
+        const wasPinned = currentState === SIDEPANEL_STATES.PINNED;
+        const becomingOverlayOrHidden = newState === SIDEPANEL_STATES.OVERLAY || newState === SIDEPANEL_STATES.HIDDEN;
+
+        // Set grace period when transitioning from PINNED to OVERLAY/HIDDEN
+        if (wasPinned && becomingOverlayOrHidden) {
+            transitionGracePeriod = true;
+            console.log("[setState] Enabling transition grace period");
+        }
+
         currentState = newState;
 
         switch (newState) {
@@ -197,8 +207,14 @@
 
     // === MOUSE EVENTS ===
     function handleMouseEnter() {
-        console.log("[handleMouseEnter] Mouse enter event triggered, current state:", currentState);
+        console.log("[handleMouseEnter] Mouse enter event triggered, current state:", currentState, "grace period:", transitionGracePeriod);
         if (currentState === SIDEPANEL_STATES.PINNED) return;
+
+        // Skip expansion during grace period
+        if (transitionGracePeriod) {
+            console.log("[handleMouseEnter] Skipping due to transition grace period");
+            return;
+        }
 
         clearTimeoutByType("collapse");
 
@@ -222,6 +238,12 @@
     function handleMouseLeave() {
         console.log("[handleMouseLeave] Mouse leave event triggered, current state:", currentState);
         if (currentState === SIDEPANEL_STATES.PINNED) return;
+
+        // Clear grace period when mouse leaves
+        if (transitionGracePeriod) {
+            transitionGracePeriod = false;
+            console.log("[handleMouseLeave] Transition grace period cleared");
+        }
 
         clearTimeoutByType("expand");
 
