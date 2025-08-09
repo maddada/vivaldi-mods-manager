@@ -18,10 +18,10 @@ A simple, cross-platform tool for installing and managing Vivaldi browser modifi
 
     ```bash
     # macOS
-    ./mac_apply_mods.sh
+    sudo ./mac_apply_mods.sh
 
     # Linux
-    ./linux_apply_mods.sh
+    sudo ./linux_apply_mods.sh
 
     # Windows
     ./window_apply_mods.bat
