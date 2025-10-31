@@ -1,30 +1,27 @@
 (function () {
-    ("use strict");
+    "use strict"
 
-    // Settings that you can configure:
+    // Settings that you can configure
     const userConfig = {
         expandDelay: 20, // time to wait before expanding the panel when mouse enters
         collapseDelay: 200, // time to wait before collapsing the panel when mouse leaves
         transitionAnimation: "0.09s ease-in-out", // animation speed for the panel
     };
 
-    // These shouldn't be changed unless you know what you're doing
+    // These shouldn't be changed unless you know what you're doing:
     const config = {
         ...userConfig,
         reinitInterval: 5000,
         initCheckInterval: 800,
         hiddenWidth: "34px",
-        minimizedWidth: "72px",
+        minimizedWidth: "76px",
         expandedWidth: "260px",
         fullWidth: "300px",
     };
 
-    function isBookmarksBarEnabled() {
-        return document.querySelector("#main > div.bookmark-bar.default") !== null;
-    }
-
     function calculateHeight() {
-        return `calc(100vh - 83px ${!isBookmarksBarEnabled() ? "+ 29px" : ""})`;
+        // Always assume bookmarks bar is disabled
+        return "calc(100vh - 54px)";
     }
 
     // State constants
@@ -59,7 +56,6 @@
     let buttonObserver = null;
     let toggleObserver = null;
     let panelObserver = null;
-    let bookmarksObserver = null;
 
     // === INITIALIZATION ===
     function init() {
@@ -67,9 +63,6 @@
 
         panelsContainer = document.getElementById("panels-container");
         toggleButton = document.querySelector("#panels #switch div.button-toolbar.toolbar-spacer-flexible");
-
-        console.log("[init] Bookmarks bar enabled:", isBookmarksBarEnabled());
-        bookmarksBarInHeightCalc = isBookmarksBarEnabled();
 
         if (!panelsContainer) {
             return false;
@@ -85,7 +78,6 @@
         markAsInitialized();
         setupToggleButton();
         setupPanelWidthObserver();
-        setupBookmarksBarObserver();
         setupToolbarClickListener();
 
         return true;
@@ -388,44 +380,6 @@
         console.log("[setupPanelWidthObserver] Panel width observer started");
     }
 
-    function setupBookmarksBarObserver() {
-        console.log("[setupBookmarksBarObserver] Setting up bookmarks bar observer");
-
-        let previousBookmarksBarState = isBookmarksBarEnabled();
-
-        // Create observer to watch for DOM changes that might affect bookmarks bar
-        bookmarksObserver = new MutationObserver((mutations) => {
-            const currentBookmarksBarState = isBookmarksBarEnabled();
-
-            if (currentBookmarksBarState !== previousBookmarksBarState) {
-                console.log("[setupBookmarksBarObserver] Bookmarks bar state changed from", previousBookmarksBarState, "to", currentBookmarksBarState);
-                previousBookmarksBarState = currentBookmarksBarState;
-                bookmarksBarInHeightCalc = currentBookmarksBarState;
-
-                // Re-apply styles with new height calculation if not in PINNED state
-                if (currentState !== SIDEPANEL_STATES.PINNED) {
-                    console.log("[setupBookmarksBarObserver] Re-applying styles due to bookmarks bar change");
-                    const widthToUse = currentState === SIDEPANEL_STATES.HIDDEN ? config.hiddenWidth : config.minimizedWidth;
-                    applyStyles(widthToUse);
-                }
-            }
-        });
-
-        // Start observing the main container for changes
-        const mainContainer = document.querySelector("#main");
-        if (mainContainer) {
-            bookmarksObserver.observe(mainContainer, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ["class", "style"],
-            });
-            console.log("[setupBookmarksBarObserver] Bookmarks bar observer started");
-        } else {
-            console.log("[setupBookmarksBarObserver] Main container not found, observer not started");
-        }
-    }
-
     // === TOOLBAR CLICK LISTENER ===
     function setupToolbarClickListener() {
         const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
@@ -578,9 +532,6 @@
         }
         if (panelObserver) {
             panelObserver.disconnect();
-        }
-        if (bookmarksObserver) {
-            bookmarksObserver.disconnect();
         }
 
         // Remove styles

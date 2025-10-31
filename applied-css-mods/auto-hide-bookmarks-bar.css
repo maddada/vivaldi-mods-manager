@@ -1,0 +1,140 @@
+/* Auto-hide Bookmarks Bar - Thanks to  */
+
+/* ========== CSS VARIABLES ========== */
+:root {
+    /* User Settings */
+    --auto-hide-bookmark_bar: true;
+
+    /* Layout Heights */
+    --bookmark_bar-height: 29px;
+    --bookmark_bar-height-top: 0px;
+    --bookmark_bar-height-bottom: 0px;
+
+    /* Animation & Transitions */
+    --transition-main: transform 0.2s ease, height 0.2s ease;
+}
+
+#browser {
+    container-type: inline-size;
+    container-name: translate;
+
+    /* Auto-hide position calculations */
+    --auto-hide-bookmark-Y-top: 0px;
+    --auto-hide-bookmark-Y-bottom: 0px;
+    --bookmark-Y-top: 0px;
+    --bookmark-Y-bottom: 0px;
+    --bookmark-margin-top: 0px;
+    --bookmark-margin-bottom: 0px;
+
+    --header-hover-height: 10px;
+    --footer-hover-height: 10px;
+    --tab_bar-height-top: 0px;
+    --address_bar-height-top: 0px;
+    --tab_bar-height-bottom: 0px;
+    --address_bar-height-bottom: 0px;
+    --auto-hide-tab-Y-top: 0px;
+    --auto-hide-address-Y-top: 0px;
+    --auto-hide-tab-Y-bottom: 0px;
+    --auto-hide-address-Y-bottom: 0px;
+
+    --is-hovering: none;
+}
+
+/* ========== BASIC LAYOUT ========== */
+.bookmark-bar {
+    transition: var(--transition-main);
+    z-index: 10;
+}
+
+/* ========== BOOKMARK BAR POSITIONING ========== */
+#browser.bookmark-bar-top {
+    --bookmark-Y-top: calc(
+        (var(--tab_bar-height-top) + var(--address_bar-height-top)) -
+        var(--auto-hide-tab-Y-top) - var(--auto-hide-address-Y-top) -
+        var(--auto-hide-bookmark-Y-top)
+    );
+
+    @container style(--auto-hide-bookmark_bar: true) {
+        --auto-hide-bookmark-Y-top: var(--bookmark_bar-height);
+    }
+    @container style(--auto-hide-bookmark_bar: false) {
+        --auto-hide-bookmark-Y-top: 0px;
+        --bookmark-margin-top: var(--bookmark_bar-height);
+        --header-hover-height: 0px;
+    }
+}
+
+#browser.bookmark-bar-bottom {
+    --bookmark-Y-bottom: calc(
+        -1 * (var(--tab_bar-height-bottom) + var(--address_bar-height-bottom)) +
+        var(--auto-hide-tab-Y-bottom) + var(--auto-hide-address-Y-bottom) +
+        var(--auto-hide-bookmark-Y-bottom)
+    );
+
+    @container style(--auto-hide-bookmark_bar: true) {
+        --auto-hide-bookmark-Y-bottom: var(--bookmark_bar-height);
+    }
+    @container style(--auto-hide-bookmark_bar: false) {
+        --auto-hide-bookmark-Y-bottom: 0px;
+        --bookmark-margin-bottom: var(--bookmark_bar-height);
+        --footer-hover-height: 0px;
+    }
+    .bookmark-bar {
+        align-self: self-end;
+    }
+}
+
+/* ========== HOVER STATES ========== */
+#browser:has(#modal-bg.toolbar-editor) {
+    --is-hovering: all !important;
+    --auto-hide-bookmark-Y-bottom: 0px !important;
+    --auto-hide-bookmark-Y-top: 0px !important;
+}
+
+#browser:has(.button-popup),
+#browser:has(:is(#header, .address-top .mainbar, .bookmark-bar-top .bookmark-bar):hover) {
+    --is-hovering: top;
+    --auto-hide-bookmark-Y-top: 0px !important;
+}
+
+#browser:has(.button-popup),
+#browser:has(:is(#footer, .address-bottom .mainbar, .bookmark-bar-bottom .bookmark-bar):hover) {
+    --is-hovering: bottom;
+    --auto-hide-bookmark-Y-bottom: 0px !important;
+}
+
+/* ========== AUTO-HIDE BOOKMARK BAR ========== */
+#browser.bookmark-bar-top {
+    .bookmark-bar {
+        height: 35px !important;
+        padding-top: 5px !important;
+        width: 100vw;
+        position: absolute;
+        transform: translateY(var(--bookmark-Y-top));
+    }
+}
+
+.bookmarkbarItem .title {
+    margin-top: 1px !important;
+}
+
+#browser.bookmark-bar-bottom {
+    .bookmark-bar {
+        width: 100vw;
+        position: absolute;
+        transform: translateY(var(--bookmark-Y-bottom));
+    }
+}
+
+@container style(--auto-hide-bookmark_bar: true) {
+    .bookmark-bar {
+        z-index: 9;
+    }
+}
+
+/* Bookmark bar positioning for non-auto-hide elements */
+@container style(--auto-hide-bookmark_bar: false) {
+    .bookmark-bar {
+        z-index: 10;
+    }
+}
