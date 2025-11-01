@@ -58,6 +58,7 @@
     let toggleObserver = null;
     let panelObserver = null;
     let bookmarksObserver = null;
+    let noActiveButtonObserver = null;
 
     // === INITIALIZATION ===
     function init() {
@@ -81,6 +82,7 @@
         setupToggleButton();
         setupPanelWidthObserver();
         setupBookmarksBarObserver();
+        setupNoActiveButtonObserver();
         setupToolbarClickListener();
 
         return true;
@@ -401,6 +403,39 @@
         }
     }
 
+    function setupNoActiveButtonObserver() {
+        const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
+
+        if (!toolbarElement) {
+            console.log("[setupNoActiveButtonObserver] Toolbar element not found");
+            return;
+        }
+
+        noActiveButtonObserver = new MutationObserver(() => {
+            // Check if there are no active buttons
+            const hasActiveButton = toolbarElement.querySelector('.button-toolbar.active');
+
+            if (!hasActiveButton && currentState === SIDEPANEL_STATES.OVERLAY) {
+                console.log("[setupNoActiveButtonObserver] No active buttons detected while in OVERLAY mode, switching to PINNED");
+
+                // Save current state (same pattern as non-Sharp Tabs button click at line 453)
+                if (!previousState) {
+                    previousState = currentState;
+                }
+                setState(SIDEPANEL_STATES.PINNED);
+            }
+        });
+
+        noActiveButtonObserver.observe(toolbarElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        console.log("[setupNoActiveButtonObserver] No active button observer started");
+    }
+
     // === TOOLBAR CLICK LISTENER ===
     function setupToolbarClickListener() {
         const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
@@ -533,6 +568,9 @@
         }
         if (bookmarksObserver) {
             bookmarksObserver.disconnect();
+        }
+        if (noActiveButtonObserver) {
+            noActiveButtonObserver.disconnect();
         }
 
         // Remove styles
