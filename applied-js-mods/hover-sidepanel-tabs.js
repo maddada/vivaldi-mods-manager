@@ -1,11 +1,11 @@
 (function () {
-    "use strict"
+    "use strict";
 
     // Settings that you can configure
     const userConfig = {
         expandDelay: 0, // time to wait before expanding the panel when mouse enters
         collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-        transitionAnimation: "0.09s ease-in-out", // animation speed for the panel
+        transitionAnimation: "0.22s ease-in-out", // animation speed for the panel
     };
 
     // These shouldn't be changed unless you know what you're doing:
@@ -20,7 +20,7 @@
     };
 
     function calculateHeight() {
-        // Always assume bookmarks bar is disabled
+        // Always assume bookmarks bar is disabled since we're making it show on hover
         return "calc(100vh - 54px)";
     }
 
@@ -140,7 +140,8 @@
 
         removeStyles();
 
-        const styles = `
+        const styles = dedent(
+            /*CSS*/ `
             :root {
                 --width-1: ${config.fullWidth};
                 --width-minimized: ${actualWidth};
@@ -150,7 +151,7 @@
                 width: var(--width-1) !important;
             }
             #webview-container {
-                padding-left: var(--width-minimized) !important;
+                padding-left: 43px !important;
             }
             #panels-container:not(.panel-expanded) {
                 width: var(--width-minimized) !important;
@@ -159,6 +160,7 @@
                 position: absolute !important;
                 height: ${calculateHeight()} !important;
                 transition: width ${config.transitionAnimation} !important;
+                will-change: width;
             }
             .panel-collapse-guard {
                 min-width: var(--width-minimized) !important;
@@ -167,7 +169,9 @@
             #panels-container.panel-expanded {
                 width: var(--width-hovered) !important;
             }
-        `;
+
+        ` + window.vivazenStyles
+        );
 
         const styleElement = document.createElement("style");
         styleElement.id = "vivaldi-sidebar-styles";
@@ -561,3 +565,7 @@
     console.log("[SCRIPT START] Vivaldi Sidebar Manager starting execution. Looking for panels-container to initialize styles on it.");
     initInterval = setInterval(initializeManager, config.initCheckInterval);
 })();
+
+function dedent(css) {
+    return css.replace(/^ {4}/gm, "");
+}

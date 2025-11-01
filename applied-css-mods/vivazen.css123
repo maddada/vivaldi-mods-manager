@@ -28,7 +28,8 @@
     --tab-width-normal: 250px;
 
     /* Animation & Transitions */
-    --transition-main: transform 0.2s ease, height 0.2s ease;
+    --transition-main: transform 0.2s linear, height 0.2s ease;
+    --transition-web-panel: transform 0.25s ease-in-out, width 0.25s ease-in-out;
 
     /* Background Configuration */
     --background: linear-gradient(90deg, #064547, #46bf7e, #06938c, #064547);
@@ -201,8 +202,8 @@
 /* ========== ADDRESS BAR POSITIONING ========== */
 #browser.address-top {
     &:not(.tabs-top) {
-        --address_bar-height: 46px;
-        --auto-hide-address-Y-top: 46px;
+        --address_bar-height: 54px;
+        --auto-hide-address-Y-top: 54px;
     }
     @container style(--auto-hide-address_bar: true) {
         --address_bar-height-top: var(--address_bar-height);
@@ -543,7 +544,7 @@ footer#footer {
 /* ========== WEB PANEL ========== */
 @container style(--auto-hide-web-panel: true) {
     div#panels-container {
-        transition: var(--transition-main) !important;
+        transition: var(--transition-web-panel) !important;
         will-change: width;
         position: absolute !important;
         height: 100%;
@@ -569,7 +570,7 @@ footer#footer {
         }
 
         &.left {
-            transform: translateX(calc(-100% + 10px));
+            transform: translateX(calc(-100% + 43px));
         }
         &.right {
             transform: translateX(calc(100vw - 10px));

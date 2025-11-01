@@ -1,0 +1,731 @@
+(function () {
+    window.vivazenStyles = /*CSS*/ `
+    /* ========== CSS VARIABLES ========== */
+    :root {
+        /* User Settings */
+        --use-theme: false;
+        --auto-hide-tab_bar: false;
+        --auto-hide-address_bar: false;
+        --auto-hide-bookmark_bar: true;
+        --auto-hide-web-panel: true;
+
+        /* Layout Heights & Positions */
+        --titlebar-height: 0px;
+        --status_bar-height: 0px;
+        --tab_bar-height: 42px;
+        --tab_bar-height-stacked: 75px;
+        --address_bar-height: 40px;
+        --bookmark_bar-height: 29px;
+        --tab_bar-height-top: 0px;
+        --address_bar-height-top: 0px;
+        --bookmark_bar-height-top: 0px;
+        --tab_bar-height-bottom: 0px;
+        --address_bar-height-bottom: 0px;
+        --bookmark_bar-height-bottom: 0px;
+
+        --is-hovering: none;
+        --tab-width-stacked: 500px;
+        --tab-width-normal: 250px;
+
+        /* Animation & Transitions */
+        --transition-main: transform 0.2s linear, height 0.2s ease;
+        --transition-web-panel: transform 0.22s ease-in-out, width 0.22s ease-in-out;
+
+        /* Background Configuration */
+        --background: linear-gradient(90deg, #064547, #46bf7e, #06938c, #064547);
+        --background-size: 100vw 100vh;
+        --color: #ffffff;
+        --address-input-shadow: #ffffff21;
+    }
+
+    #browser {
+        container-type: inline-size;
+        container-name: translate;
+        overflow: clip;
+
+        /* Auto-hide position calculations for top elements */
+        --auto-hide-tab-Y-top: 0px;
+        --auto-hide-address-Y-top: 0px;
+        --auto-hide-bookmark-Y-top: 0px;
+        --tab-Y-top: calc(0px - var(--auto-hide-tab-Y-top));
+        --address-Y-top: calc(var(--tab_bar-height-top) - var(--auto-hide-tab-Y-top) - var(--auto-hide-address-Y-top));
+        --bookmark-Y-top: calc(
+            (var(--tab_bar-height-top) + var(--address_bar-height-top)) - var(--auto-hide-tab-Y-top) - var(--auto-hide-address-Y-top) - var(--auto-hide-bookmark-Y-top)
+        );
+
+        /* Auto-hide position calculations for bottom elements */
+        --auto-hide-tab-Y-bottom: 0px;
+        --auto-hide-address-Y-bottom: 0px;
+        --auto-hide-bookmark-Y-bottom: 0px;
+        --tab-Y-bottom: calc(0px + var(--auto-hide-tab-Y-bottom) - var(--status_bar-height));
+        --address-Y-bottom: calc(-1 * (var(--tab_bar-height-bottom) - var(--auto-hide-tab-Y-bottom) - var(--auto-hide-address-Y-bottom)));
+        --bookmark-Y-bottom: calc(
+            -1 * (var(--tab_bar-height-bottom) + var(--address_bar-height-bottom)) + var(--auto-hide-tab-Y-bottom) + var(--auto-hide-address-Y-bottom) +
+                var(--auto-hide-bookmark-Y-bottom)
+        );
+        --header-hover-height: 10px;
+        --footer-hover-height: 10px;
+        --tab-margin-top: 0px;
+        --address-margin-top: 0px;
+        --bookmark-margin-top: 0px;
+        --margin-start: calc(var(--address-margin-top) + var(--bookmark-margin-top) + var(--header-hover-height));
+        --tab-margin-bottom: 0px;
+        --address-margin-bottom: 0px;
+        --bookmark-margin-bottom: 0px;
+        --margin-end: calc(var(--address-margin-bottom) + var(--bookmark-margin-bottom) + var(--footer-hover-height));
+    }
+
+    /* ========== BASIC LAYOUT ELEMENTS ========== */
+    #main {
+        overflow: visible;
+        z-index: 8;
+        display: grid;
+    }
+
+    /* Fullscreen mode */
+    #browser.fullscreen .mainbar {
+        display: none !important;
+    }
+
+    #header,
+    #footer,
+    .mainbar,
+    .bookmark-bar {
+        transition: var(--transition-main);
+        z-index: 10;
+    }
+
+    .inner {
+        grid-row: 1;
+        margin-block-start: var(--margin-start);
+        margin-block-end: var(--margin-end);
+        overflow: clip !important;
+    }
+
+    #footer {
+        overflow: visible !important;
+        border: none !important;
+
+        > .toolbar-statusbar {
+            z-index: 12;
+            background-color: var(--colorWindowBg);
+        }
+    }
+    #panels-container {
+        z-index: 8 !important;
+    }
+    .extension-popup,
+    .tooltip,
+    .mainbar:has(.OmniDropdown),
+    .StatusInfo {
+        z-index: 100 !important;
+    }
+
+    .tabbar-wrapper:empty {
+        display: none !important;
+    }
+
+    #header,
+    #header *,
+    #footer,
+    #footer *,
+    .bookmark-bar,
+    .bookmark-bar * {
+        -webkit-app-region: no-drag !important;
+    }
+
+    .mainbar,
+    .mainbar * {
+        -webkit-app-region: drag !important;
+    }
+
+    #browser:has(#header #pagetitle) {
+        --header-hover-height: 0px;
+    }
+    #browser:not(.address-top):not(.bookmark-bar-top):not(.tabs-top) {
+        --titlebar-height: 28px;
+        --header-hover-height: 0px;
+    }
+
+    #browser:not(.address-bottom):not(.bookmark-bar-bottom):not(.tabs-bottom) {
+        --footer-hover-height: 0px;
+    }
+
+    #browser:has(#footer > .toolbar-statusbar) {
+        --status_bar-height: 34px;
+        --footer-hover-height: 0px;
+    }
+
+    /* ========== TABS POSITIONING ========== */
+    #browser.tabs-top {
+        --tab_bar-height-top: var(--tab_bar-height);
+
+        @container style(--auto-hide-tab_bar: true) {
+            --auto-hide-tab-Y-top: var(--tab_bar-height);
+        }
+        @container style(--auto-hide-tab_bar: false) {
+            --tab-margin-top: var(--tab_bar-height);
+            --header-hover-height: 0px;
+        }
+        &:has(.tabbar-wrapper #tabs-tabbar-container #tabs-subcontainer) {
+            @container style(--auto-hide-tab_bar: true) {
+                --auto-hide-tab-Y-top: var(--tab_bar-height-stacked);
+            }
+            @container style(--auto-hide-tab_bar: false) {
+                --tab-margin-top: var(--tab_bar-height-stacked);
+            }
+            --tab_bar-height-top: var(--tab_bar-height-stacked);
+        }
+    }
+
+    #browser.tabs-bottom {
+        --tab_bar-height-bottom: var(--tab_bar-height);
+
+        @container style(--auto-hide-tab_bar: true) {
+            --auto-hide-tab-Y-bottom: var(--tab_bar-height);
+        }
+        @container style(--auto-hide-tab_bar: false) {
+            --tab-margin-bottom: var(--tab_bar-height);
+            --footer-hover-height: 0px;
+        }
+        &:has(.tabbar-wrapper #tabs-tabbar-container #tabs-subcontainer) {
+            @container style(--auto-hide-tab_bar: true) {
+                --auto-hide-tab-Y-bottom: var(--tab_bar-height-stacked);
+            }
+            @container style(--auto-hide-tab_bar: false) {
+                --tab-margin-bottom: var(--tab_bar-height-stacked);
+            }
+            --tab_bar-height-bottom: var(--tab_bar-height-stacked);
+        }
+    }
+
+    /* ========== ADDRESS BAR POSITIONING ========== */
+    #browser.address-top {
+        &:not(.tabs-top) {
+            --address_bar-height: 54px;
+            --auto-hide-address-Y-top: 54px;
+        }
+        @container style(--auto-hide-address_bar: true) {
+            --address_bar-height-top: var(--address_bar-height);
+            --auto-hide-address-Y-top: var(--address_bar-height);
+        }
+
+        @container style(--auto-hide-address_bar: false) {
+            --address_bar-height-top: var(--address_bar-height);
+            --auto-hide-address-Y-top: 0px !important;
+            --address-margin-top: var(--address_bar-height);
+            --header-hover-height: 0px;
+        }
+    }
+    #browser.address-bottom {
+        @container style(--auto-hide-address_bar: true) {
+            --auto-hide-address-Y-bottom: 42px;
+            --address_bar-height-bottom: var(--address_bar-height);
+        }
+
+        @container style(--auto-hide-address_bar: false) {
+            --auto-hide-address-Y-bottom: 0px;
+            --address_bar-height-bottom: var(--address_bar-height);
+            --address-margin-bottom: var(--address_bar-height);
+            --footer-hover-height: 0px;
+        }
+    }
+
+    /* ========== BOOKMARK BAR POSITIONING ========== */
+    #browser.bookmark-bar-top {
+        @container style(--auto-hide-bookmark_bar: true) {
+            --auto-hide-bookmark-Y-top: var(--bookmark_bar-height);
+        }
+        @container style(--auto-hide-bookmark_bar: false) {
+            --auto-hide-bookmark-Y-top: 0px;
+            --bookmark-margin-top: var(--bookmark_bar-height);
+            --header-hover-height: 0px;
+        }
+    }
+
+    #browser.bookmark-bar-bottom {
+        @container style(--auto-hide-bookmark_bar: true) {
+            --auto-hide-bookmark-Y-bottom: var(--bookmark_bar-height);
+        }
+        @container style(--auto-hide-bookmark_bar: false) {
+            --auto-hide-bookmark-Y-bottom: 0px;
+            --bookmark-margin-bottom: var(--bookmark_bar-height);
+            --footer-hover-height: 0px;
+        }
+        .bookmark-bar {
+            align-self: self-end;
+        }
+    }
+
+    /* ========== HOVER STATES ========== */
+    #browser:has(#modal-bg.toolbar-editor) {
+        --is-hovering: all !important;
+        --auto-hide-tab-Y-bottom: 0px !important;
+        --auto-hide-address-Y-bottom: 0px !important;
+        --auto-hide-bookmark-Y-bottom: 0px !important;
+        --auto-hide-tab-Y-top: 0px !important;
+        --auto-hide-address-Y-top: 0px !important;
+        --auto-hide-bookmark-Y-top: 0px !important;
+    }
+    #browser:has(.button-popup),
+    #browser:has(:is(#header, .address-top .mainbar, .bookmark-bar-top .bookmark-bar):hover) {
+        --is-hovering: top;
+        --auto-hide-tab-Y-top: 0px !important;
+        --auto-hide-address-Y-top: 0px !important;
+        --auto-hide-bookmark-Y-top: 0px !important;
+    }
+    #browser:has(.button-popup),
+    #browser:has(:is(#footer, .address-bottom .mainbar, .bookmark-bar-bottom .bookmark-bar):hover) {
+        --is-hovering: bottom;
+        --auto-hide-tab-Y-bottom: 0px !important;
+        --auto-hide-address-Y-bottom: 0px !important;
+        --auto-hide-bookmark-Y-bottom: 0px !important;
+    }
+
+    @container style(--auto-hide-tab_bar: false) {
+        #browser {
+            --tab_bar-height-top: 0px !important;
+            --tab_bar-height-bottom: 0px !important;
+        }
+    }
+
+    /* ========== AUTO-HIDE BEHAVIORS ========== */
+    #header:not(:has(#pagetitle))::before,
+    #footer::before {
+        content: "";
+        width: 100%;
+        position: absolute;
+        z-index: 9;
+        background: transparent;
+        transition: var(--transition-main);
+    }
+    #browser:not(.tabs-top):not(.address-top):not(.bookmark-bar-top) {
+        --margin-start: 0px;
+
+        #header::before {
+            display: none;
+        }
+    }
+    #header:empty {
+        display: block !important;
+        z-index: 9;
+    }
+    #header::before {
+        height: var(--header-hover-height);
+        transform: translateY(0px);
+
+        @container style(--is-hovering: top) {
+            transform: translateY(-100%);
+        }
+    }
+    #browser.tabs-top #header::before {
+        transform: translateY(var(--header-hover-height)) !important;
+    }
+
+    #browser.tabs-bottom #footer::before {
+        height: var(--footer-hover-height);
+        transform: translateY(0%);
+
+        @container style(--is-hovering: bottom) {
+            transform: translateY(100%);
+        }
+    }
+    #browser:not(.tabs-bottom) #footer::before {
+        height: var(--footer-hover-height);
+        transform: translateY(-100%);
+
+        @container style(--is-hovering: bottom) {
+            transform: translateY(0%);
+        }
+    }
+
+    #browser.tabs-top #footer::before {
+        transform: translateY(calc(-1 * var(--footer-hover-height))) !important;
+    }
+
+    #browser:not(.tabs-bottom):not(.address-bottom):not(.bookmark-bar-bottom) footer#footer {
+        display: none;
+    }
+
+    footer#footer {
+        display: block !important;
+        z-index: 8;
+        flex: 0 0 auto;
+    }
+
+    #browser.tabs-bottom footer#footer {
+        display: flex !important;
+
+        .toolbar-statusbar {
+            background-color: var(--colorTabBar, transparent);
+        }
+    }
+
+    /* ========== AUTO-HIDE BEHAVIORS ========== */
+    /* ========== TABS BAR ========== */
+    @container style(--auto-hide-tab_bar: true) {
+        #browser.tabs-top {
+            #header {
+                width: 100vw;
+                position: absolute;
+                transform: translateY(var(--tab-Y-top));
+                z-index: 9 !important;
+            }
+        }
+        #browser.tabs-bottom {
+            #footer .tabbar-wrapper {
+                width: 100vw;
+                position: absolute;
+                transform: translateY(calc(var(--tab-Y-bottom) + 0px));
+                z-index: 9;
+                transition: var(--transition-main);
+            }
+        }
+
+        #browser.tabs-left,
+        #browser.tabs-right {
+            .inner .tabbar-wrapper {
+                width: 10px;
+                z-index: 7;
+
+                #tabs-tabbar-container {
+                    &.left {
+                        transform: translateX(-100%);
+                    }
+                    &.right {
+                        transform: translateX(0%);
+                    }
+
+                    > * {
+                        opacity: 0;
+                        transition: opacity 0.2s ease;
+                    }
+                }
+            }
+
+            &:has(.button-popup),
+            &:has(:is(.inner .tabbar-wrapper):hover),
+            &.tabs-left:has(#panels-container.left:hover),
+            &.tabs-right:has(#panels-container.right:hover) {
+                #tabs-tabbar-container {
+                    &.left {
+                        transform: translateX(0%);
+                    }
+                    &.right {
+                        transform: translateX(-100%);
+                    }
+
+                    & > * {
+                        opacity: 1;
+                    }
+                }
+            }
+
+            @container style(--is-hovering: all) {
+                #tabs-tabbar-container {
+                    &.left {
+                        transform: translateX(0%) !important;
+                    }
+                    &.right {
+                        transform: translateX(-100%) !important;
+                    }
+                    > * {
+                        opacity: 1;
+                    }
+                }
+
+                &:has(.button-popup),
+                &:has(:is(.inner .tabbar-wrapper):hover) .inner {
+                    z-index: 100;
+                }
+            }
+        }
+    }
+
+    /* ========== TABS LEFT & RIGHT STYLING ========== */
+    #browser.tabs-left,
+    #browser.tabs-right {
+        .tabbar-wrapper #tabs-tabbar-container {
+            width: var(--tab-width-normal) !important;
+            display: flex;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            * {
+                opacity: 1;
+            }
+        }
+        .tabbar-wrapper #tabs-tabbar-container:has(#tabs-subcontainer) {
+            width: var(--tab-width-stacked) !important;
+        }
+        .tabbar-wrapper #tabs-container {
+            width: var(--tab-width-normal);
+            flex: none;
+            grid-column: 2;
+            grid-row: 1;
+            justify-self: end;
+        }
+
+        .tabbar-wrapper #tabs-subcontainer {
+            grid-column: 1;
+            grid-row: 1;
+            width: var(--tab-width-normal);
+            transition: width 0.3s ease;
+        }
+
+        @starting-style {
+            .tabbar-wrapper #tabs-subcontainer {
+                width: 0px;
+            }
+        }
+
+        .tabbar-wrapper #tabs-subcontainer .tab-strip {
+            width: var(--tab-width-normal);
+        }
+    }
+
+    /* ========== ADDRESS BAR ========== */
+    #browser.address-top {
+        .mainbar {
+            width: 100vw;
+            position: absolute;
+            transform: translateY(calc(var(--address-Y-top)));
+        }
+    }
+    #browser.address-bottom {
+        .mainbar {
+            width: 100vw;
+            position: absolute;
+            height: var(--address_bar-height);
+            transform: translateY(var(--address-Y-bottom));
+            align-self: end;
+        }
+    }
+    @container style(--auto-hide-address_bar: true) {
+        .mainbar {
+            z-index: 9;
+        }
+    }
+
+    /* Address bar positioning for non-auto-hide elements */
+    @container style(--auto-hide-address_bar: false) {
+        .mainbar {
+            z-index: 10;
+        }
+    }
+
+    /* ========== BOOKMARK BAR ========== */
+    #browser.bookmark-bar-top {
+        .bookmark-bar {
+            width: 100vw;
+            position: absolute;
+            transform: translateY(var(--bookmark-Y-top));
+        }
+    }
+    #browser.bookmark-bar-bottom {
+        .bookmark-bar {
+            width: 100vw;
+            position: absolute;
+            transform: translateY(var(--bookmark-Y-bottom));
+        }
+    }
+    @container style(--auto-hide-bookmark_bar: true) {
+        .bookmark-bar {
+            z-index: 9;
+        }
+    }
+
+    /* Bookmark bar positioning for non-auto-hide elements */
+    @container style(--auto-hide-bookmark_bar: false) {
+        .bookmark-bar {
+            z-index: 10;
+        }
+    }
+
+    /* ========== WEB PANEL ========== */
+    @container style(--auto-hide-web-panel: true) {
+        div#panels-container {
+            transition: var(--transition-web-panel) !important;
+            will-change: width;
+            position: absolute !important;
+            height: 100%;
+
+            &.overlay {
+                width: max-content !important;
+                right: auto !important;
+
+                #panels {
+                    width: max-content;
+                    overflow: hidden;
+                    contain: content;
+                }
+
+                .panel-group {
+                    left: 0 !important;
+                    position: relative !important;
+                    top: 0;
+                    width: auto;
+                    bottom: 0;
+                    background-color: var(--colorBgAlphaBlur);
+                }
+            }
+
+            &.left {
+                transform: translateX(calc(-100% + 43px));
+            }
+            &.right {
+                transform: translateX(calc(100vw - 10px));
+            }
+        }
+
+        #browser {
+            &:has(div#panels-container.left:hover),
+            &.tabs-left:has(div#panels-container.left):has(:is(.inner .tabbar-wrapper):hover) {
+                div#panels-container.left {
+                    transform: translateX(0);
+                }
+                #tabs-tabbar-container.left {
+                    transform: translateX(calc(0% + 41px));
+                }
+                #tabs-tabbar-container > * {
+                    opacity: 1;
+                }
+            }
+
+            &:has(div#panels-container.right:hover),
+            &.tabs-right:has(div#panels-container.right):has(:is(.inner .tabbar-wrapper):hover) {
+                div#panels-container.right {
+                    transform: translateX(calc(100vw - 100%));
+                }
+                #tabs-tabbar-container.right {
+                    transform: translateX(calc(-100% - 31px));
+                }
+                #tabs-tabbar-container > * {
+                    opacity: 1;
+                }
+            }
+        }
+    }
+
+    /* ========================================== */
+    /* ========== STYLING FOR ELEMENTS ========== */
+    /* ========================================== */
+    @container style(--use-theme: true) {
+        /* Global styles */
+        *:not(#modal-bg *):not(.button-popup):not(.button-popup *) {
+            color: var(--color);
+            --colorBgDark: #205d07;
+        }
+
+        /* Common styles for transparent background and no border */
+        #panels-container,
+        #panels-container *,
+        #footer,
+        .UrlBar-AddressField,
+        .UrlBar-AddressField *:not(.OmniDropdown),
+        #tabs-subcontainer,
+        #header,
+        #main {
+            border: none !important;
+            background: transparent !important;
+        }
+
+        /* Remove box shadow from specific elements */
+        #header,
+        #main,
+        #footer {
+            box-shadow: none !important;
+            border: none;
+        }
+
+        /* Background styles */
+        #header,
+        #browser,
+        .bookmark-bar,
+        .tabbar-wrapper,
+        .mainbar,
+        #footer > div,
+        #tabs-tabbar-container,
+        #panels-container,
+        .OmniDropdown,
+        .SpeedDialView-Settings,
+        .StatusInfo > * {
+            background: var(--background) left center no-repeat fixed !important;
+            background-size: var(--background-size) !important;
+            border: none !important;
+        }
+
+        #browser.tabs-top .tabbar-wrapper,
+        #browser.tabs-top #tabs-tabbar-container,
+        #browser.address-top .mainbar,
+        #browser.address-top .OmniDropdown,
+        #browser.bookmark-bar-top .bookmark-bar {
+            background-position: left top !important;
+        }
+        #browser.tabs-bottom .tabbar-wrapper,
+        #browser.tabs-bottom #tabs-tabbar-container,
+        #browser.address-bottom .mainbar,
+        #browser.address-bottom .OmniDropdown,
+        #browser.bookmark-bar-bottom .bookmark-bar {
+            background-position: left bottom !important;
+        }
+        #browser.tabs-left .tabbar-wrapper,
+        #panels-container.left,
+        #browser.tabs-left #tabs-tabbar-container {
+            background-position: left center !important;
+        }
+        #browser.tabs-right .tabbar-wrapper,
+        #panels-container.right,
+        #browser.tabs-right #tabs-tabbar-container {
+            background-position: right center !important;
+        }
+
+        /* URL bar styles */
+        .UrlBar-AddressField {
+            box-shadow: 0 0 20px 9px var(--address-input-shadow);
+            border-radius: 25px;
+        }
+
+        /* Header, mainbar, bookmark bar, and toolbar spacer styles */
+        #header *,
+        .mainbar > *,
+        .bookmark-bar *,
+        .toolbar-spacer,
+        .toolbar-spacer * {
+            background: transparent !important;
+            color: var(--color);
+        }
+
+        /* Workspace popup button styles */
+        .button-toolbar.workspace-popup.tabbar-workspace-button {
+            border-radius: var(--radius);
+        }
+
+        /* Start page styles */
+        .startpage *:not(#speeddial-settings-pane):not(#speeddial-settings-pane *):not(.OmniDropdown):not(.button-toolbar *) {
+            background: transparent;
+            box-shadow: none;
+            color: var(--color);
+            fill: var(--color);
+
+            select,
+            input,
+            button {
+                background: transparent !important;
+            }
+        }
+
+        /* Page transitions */
+        .webpageview {
+            visibility: visible;
+            transition: var(--transition-page);
+            view-transition-name: page-content;
+        }
+
+        @starting-style {
+            .webpageview {
+                opacity: 0 !important;
+            }
+        }
+    }
+    `;
+})();
