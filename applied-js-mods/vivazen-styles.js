@@ -38,6 +38,12 @@
         --address-input-shadow: #ffffff21;
     }
 
+    /* Make the side panel not resizeable in overlay mode */
+    /* Makes cursor not change when hovering side panel */
+    #panels-container > button.SlideBar--FullHeight {
+        display: none;
+    }
+
     #browser {
         container-type: inline-size;
         container-name: translate;
