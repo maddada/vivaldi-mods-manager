@@ -1,5 +1,7 @@
 # 🎨 Vivaldi Mods Manager
 
+Explanation of how to install the mods: https://youtu.be/rZyOo-zy4n4
+
 A simple, cross-platform tool for installing and managing Vivaldi browser modifications.
 
 > **Get more mods**: [Vivaldi Forums - Modifications](https://forum.vivaldi.net/category/52/modifications)
