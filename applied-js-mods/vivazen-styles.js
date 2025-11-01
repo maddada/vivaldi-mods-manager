@@ -6,7 +6,7 @@
         --use-theme: false;
         --auto-hide-tab_bar: false;
         --auto-hide-address_bar: false;
-        --auto-hide-bookmark_bar: true;
+        --auto-hide-bookmark_bar: false;
         --auto-hide-web-panel: true;
 
         /* Layout Heights & Positions */

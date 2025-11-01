@@ -1,11 +1,13 @@
 (function () {
-    "use strict";
+    "use strict"
+
+    let bookmarksBarInHeightCalc = false;
 
     // Settings that you can configure
     const userConfig = {
-        expandDelay: 0, // time to wait before expanding the panel when mouse enters
-        collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-        transitionAnimation: "0.22s ease-in-out", // animation speed for the panel
+        expandDelay: 20, // time to wait before expanding the panel when mouse enters
+        collapseDelay: 200, // time to wait before collapsing the panel when mouse leaves
+        transitionAnimation: "0.09s ease-in-out", // animation speed for the panel
     };
 
     // These shouldn't be changed unless you know what you're doing:
@@ -13,6 +15,7 @@
         ...userConfig,
         reinitInterval: 5000,
         initCheckInterval: 800,
+        hiddenWidth: "34px",
         minimizedWidth: "76px",
         expandedWidth: "260px",
         fullWidth: "300px",
@@ -30,6 +33,7 @@
     const SIDEPANEL_STATES = {
         PINNED: "pinned",
         OVERLAY: "overlay",
+        HIDDEN: "hidden",
     };
 
     let firstInit = true;
@@ -43,7 +47,7 @@
     let alreadyRanReactToPanelContainerWidthModification = false;
 
     // Panel Container state management
-    let stateBeforePanelContainerModification = null;
+    let stateBeforeHidingPanelContainer = null;
 
     // Timeouts
     let expandTimeout = null;
@@ -65,6 +69,9 @@
 
         panelsContainer = document.getElementById("panels-container");
         toggleButton = document.querySelector("#panels #switch div.button-toolbar.toolbar-spacer-flexible");
+
+        console.log("[init] Bookmarks bar enabled:", isBookmarksBarEnabled());
+        bookmarksBarInHeightCalc = isBookmarksBarEnabled();
 
         if (!panelsContainer) {
             return false;
@@ -97,10 +104,10 @@
     // === STATE MANAGEMENT ===
     function setState(newState) {
         const wasPinned = currentState === SIDEPANEL_STATES.PINNED;
-        const becomingOverlay = newState === SIDEPANEL_STATES.OVERLAY;
+        const becomingOverlayOrHidden = newState === SIDEPANEL_STATES.OVERLAY || newState === SIDEPANEL_STATES.HIDDEN;
 
-        // Set grace period when transitioning from PINNED to OVERLAY
-        if (wasPinned && becomingOverlay) {
+        // Set grace period when transitioning from PINNED to OVERLAY/HIDDEN
+        if (wasPinned && becomingOverlayOrHidden) {
             transitionGracePeriod = true;
             console.log("[setState] Enabling transition grace period");
         }
@@ -122,6 +129,13 @@
                 addIconToToggleButton("▶︎");
                 console.log("[setState] Set state to OVERLAY");
                 break;
+
+            case SIDEPANEL_STATES.HIDDEN:
+                applyStyles(config.hiddenWidth);
+                addEventListeners();
+                addIconToToggleButton("◁");
+                console.log("[setState] Set state to HIDDEN");
+                break;
         }
     }
 
@@ -129,20 +143,24 @@
     function applyStyles(sidebarWidth) {
         console.log("[applyStyles] Applying styles with width:", sidebarWidth);
 
+        const activeButton = getActiveSharpTabsButton();
+        const actualWidth = activeButton ? sidebarWidth : config.hiddenWidth;
+
+        console.log("[applyStyles] Active button found:", !!activeButton, "Using width:", actualWidth);
+
         removeStyles();
 
-        const styles = dedent(
-            /*CSS*/ `
+        const styles = `
             :root {
                 --width-1: ${config.fullWidth};
-                --width-minimized: ${sidebarWidth};
+                --width-minimized: ${actualWidth};
                 --width-hovered: ${config.expandedWidth};
             }
             #panels-container.panel-expanded {
                 width: var(--width-1) !important;
             }
             #webview-container {
-                padding-left: 43px !important;
+                padding-left: var(--width-minimized) !important;
             }
             #panels-container:not(.panel-expanded) {
                 width: var(--width-minimized) !important;
@@ -151,7 +169,6 @@
                 position: absolute !important;
                 height: ${calculateHeight()} !important;
                 transition: width ${config.transitionAnimation} !important;
-                will-change: width;
             }
             .panel-collapse-guard {
                 min-width: var(--width-minimized) !important;
@@ -160,9 +177,7 @@
             #panels-container.panel-expanded {
                 width: var(--width-hovered) !important;
             }
-
-        ` + window.vivazenStyles
-        );
+        `;
 
         const styleElement = document.createElement("style");
         styleElement.id = "vivaldi-sidebar-styles";
@@ -297,24 +312,34 @@
             // temp fix for bug
             if (!currentState) currentState = SIDEPANEL_STATES.PINNED;
 
-            // Toggle between PINNED and OVERLAY
             const transitions = {
                 [SIDEPANEL_STATES.PINNED]: SIDEPANEL_STATES.OVERLAY,
                 [SIDEPANEL_STATES.OVERLAY]: SIDEPANEL_STATES.PINNED,
+                [SIDEPANEL_STATES.HIDDEN]: SIDEPANEL_STATES.PINNED,
             };
 
-            const nextState = transitions[currentState];
-
-            // Only allow transitioning to OVERLAY if Sharp Tabs is active
-            if (nextState === SIDEPANEL_STATES.OVERLAY && !getActiveSharpTabsButton()) {
-                console.log("[handleLeftClick] Cannot transition to OVERLAY - no active Sharp Tabs button");
-                return;
-            }
-
-            if (nextState === SIDEPANEL_STATES.PINNED) {
+            if (transitions[currentState] === SIDEPANEL_STATES.PINNED) {
                 console.log("[handleLeftClick] Setting state to PINNED from handleLeftClick function");
             }
-            setState(nextState);
+            setState(transitions[currentState]);
+        });
+
+        toggleButton.addEventListener("auxclick", (e) => {
+            console.log("[attachToggleListeners] Toggle button middle click event triggered");
+
+            if (e.button === 1) {
+                e.preventDefault();
+
+                console.log("[handleMiddleClick] Middle click - current state:", currentState);
+
+                const transitions = {
+                    [SIDEPANEL_STATES.PINNED]: SIDEPANEL_STATES.HIDDEN,
+                    [SIDEPANEL_STATES.OVERLAY]: SIDEPANEL_STATES.HIDDEN,
+                    [SIDEPANEL_STATES.HIDDEN]: SIDEPANEL_STATES.OVERLAY,
+                };
+
+                setState(transitions[currentState]);
+            }
         });
     }
 
@@ -377,11 +402,13 @@
             if (currentBookmarksBarState !== previousBookmarksBarState) {
                 console.log("[setupBookmarksBarObserver] Bookmarks bar state changed from", previousBookmarksBarState, "to", currentBookmarksBarState);
                 previousBookmarksBarState = currentBookmarksBarState;
+                bookmarksBarInHeightCalc = currentBookmarksBarState;
 
                 // Re-apply styles with new height calculation if not in PINNED state
                 if (currentState !== SIDEPANEL_STATES.PINNED) {
                     console.log("[setupBookmarksBarObserver] Re-applying styles due to bookmarks bar change");
-                    applyStyles(config.minimizedWidth);
+                    const widthToUse = currentState === SIDEPANEL_STATES.HIDDEN ? config.hiddenWidth : config.minimizedWidth;
+                    applyStyles(widthToUse);
                 }
             }
         });
@@ -436,6 +463,7 @@
                         setState(previousState || SIDEPANEL_STATES.PINNED);
                         previousState = null;
                     } else {
+                        debugger;
                         console.log("[Toolbar Click] Sharp Tabs button clicked and inactive");
                         const currentPanelContainerWidth = getCurrentPanelContainerWidth();
                         if (currentPanelContainerWidth === "35px") {
@@ -479,6 +507,21 @@
     function reactToPanelContainerWidthModification() {
         if (buttonClicked) {
             console.log("[reactToPanelContainerWidthModification] Button clicked, skipping width modification");
+
+            // if (previousStateBeforeDeactivation && getActiveSharpTabsButton()) {
+            //     console.log("[reactToPanelContainerWidthModification] Sharp Tabs button active, setting to previous state");
+            //     setState(previousStateBeforeDeactivation);
+            //     previousStateBeforeDeactivation = null;
+            //     return;
+            // }
+
+            // if (currentState === SIDEPANEL_STATES.OVERLAY && !getActiveSharpTabsButton()) {
+            //     console.log("[reactToPanelContainerWidthModification] Sharp Tabs button not active, setting to pinned");
+            //     previousStateBeforeDeactivation = currentState;
+            //     setState(SIDEPANEL_STATES.PINNED);
+
+            //     return;
+            // }
             return;
         }
 
@@ -490,12 +533,19 @@
             return;
         }
 
+        // if (stateBeforeHidingPanelContainer) {
+        //     console.log("[reactToPanelContainerWidthModification] State before hiding panel container, setting to previous state");
+        //     setState(stateBeforeHidingPanelContainer);
+        //     stateBeforeHidingPanelContainer = null;
+        //     return;
+        // }
+
         // Check current width of panels-container to determine initial state
         const currentPanelContainerWidth = getCurrentPanelContainerWidth();
 
         console.log("[reactToPanelContainerWidthModification] Panel container width changed to:", currentPanelContainerWidth);
 
-        stateBeforePanelContainerModification = currentState;
+        stateBeforeHidingPanelContainer = currentState;
 
         if (currentPanelContainerWidth === "0px") {
             console.log("[reactToPanelContainerWidthModification] Initial width is 0px, setting to pinned with overlay saved");
@@ -505,10 +555,10 @@
             firstInit = false;
             // Width is not 0px - initialize to overlay state
             console.log("[reactToPanelContainerWidthModification] Initial width is not 0px, setting to overlay");
-            setState(stateBeforePanelContainerModification || SIDEPANEL_STATES.OVERLAY);
+            setState(stateBeforeHidingPanelContainer || SIDEPANEL_STATES.OVERLAY);
         } else {
             console.log("[reactToPanelContainerWidthModification] Initial width is not 0px, setting to pinned");
-            setState(stateBeforePanelContainerModification);
+            setState(stateBeforeHidingPanelContainer);
         }
     }
 
@@ -562,7 +612,3 @@
     console.log("[SCRIPT START] Vivaldi Sidebar Manager starting execution. Looking for panels-container to initialize styles on it.");
     initInterval = setInterval(initializeManager, config.initCheckInterval);
 })();
-
-function dedent(css) {
-    return css.replace(/^ {4}/gm, "");
-}
