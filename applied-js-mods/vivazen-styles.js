@@ -29,7 +29,7 @@
 
         /* Animation & Transitions */
         --transition-main: transform 0.2s linear, height 0.2s ease;
-        --transition-web-panel: transform 0.22s ease-in-out, width 0.22s ease-in-out;
+        --transition-web-panel: transform 0.2s ease-in-out, width 0.2s ease-in-out;
 
         /* Background Configuration */
         --background: linear-gradient(90deg, #064547, #46bf7e, #06938c, #064547);

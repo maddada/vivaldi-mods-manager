@@ -5,7 +5,7 @@
     const userConfig = {
         expandDelay: 0, // time to wait before expanding the panel when mouse enters
         collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-        transitionAnimation: "0.22s ease-in-out", // animation speed for the panel
+        transitionAnimation: "0.2s ease-in-out", // animation speed for the panel
     };
 
     // These shouldn't be changed unless you know what you're doing:
