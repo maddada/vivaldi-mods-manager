@@ -11,7 +11,7 @@
     // These shouldn't be changed unless you know what you're doing:
     const config = {
         ...userConfig,
-        minimizedWidth: "76px",
+        minimizedWidth: "77px",
         expandedWidth: "260px",
         fullWidth: "300px",
     };
@@ -19,7 +19,7 @@
     const styles = dedent(/*CSS*/ `
         :root {
             --width-full: ${config.fullWidth};
-            --width-minimized: ${sidebarWidth};
+            --width-minimized: ${config.minimizedWidth};
             --width-hovered: ${config.expandedWidth};
             --transition-web-panel: transform ${config.animationSpeed} ease-in-out, width ${config.animationSpeed} ease-in-out;
         }
@@ -72,10 +72,6 @@
         }
     `);
 
-    function isBookmarksBarEnabled() {
-        return document.querySelector("#main > div.bookmark-bar.default") !== null;
-    }
-
     // State constants
     const SIDEPANEL_STATES = {
         PINNED: "pinned",
@@ -107,7 +103,6 @@
     let buttonObserver = null;
     let toggleObserver = null;
     let panelObserver = null;
-    let bookmarksObserver = null;
     let noActiveButtonObserver = null;
 
     // === INITIALIZATION ===
@@ -131,7 +126,6 @@
         markAsInitialized();
         setupToggleButton();
         setupPanelWidthObserver();
-        setupBookmarksBarObserver();
         setupNoActiveButtonObserver();
         setupToolbarClickListener();
 
@@ -384,42 +378,6 @@
         console.log("[setupPanelWidthObserver] Panel width observer started");
     }
 
-    function setupBookmarksBarObserver() {
-        console.log("[setupBookmarksBarObserver] Setting up bookmarks bar observer");
-
-        let previousBookmarksBarState = isBookmarksBarEnabled();
-
-        // Create observer to watch for DOM changes that might affect bookmarks bar
-        bookmarksObserver = new MutationObserver((mutations) => {
-            const currentBookmarksBarState = isBookmarksBarEnabled();
-
-            if (currentBookmarksBarState !== previousBookmarksBarState) {
-                console.log("[setupBookmarksBarObserver] Bookmarks bar state changed from", previousBookmarksBarState, "to", currentBookmarksBarState);
-                previousBookmarksBarState = currentBookmarksBarState;
-
-                // Re-apply styles with new height calculation if not in PINNED state
-                if (currentState !== SIDEPANEL_STATES.PINNED) {
-                    console.log("[setupBookmarksBarObserver] Re-applying styles due to bookmarks bar change");
-                    applyStyles(config.minimizedWidth);
-                }
-            }
-        });
-
-        // Start observing the main container for changes
-        const mainContainer = document.querySelector("#main");
-        if (mainContainer) {
-            bookmarksObserver.observe(mainContainer, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ["class", "style"],
-            });
-            console.log("[setupBookmarksBarObserver] Bookmarks bar observer started");
-        } else {
-            console.log("[setupBookmarksBarObserver] Main container not found, observer not started");
-        }
-    }
-
     function setupNoActiveButtonObserver() {
         const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
 
@@ -547,10 +505,13 @@
 
         console.log("[reactToPanelContainerWidthModification] Panel container width changed to:", currentPanelContainerWidth);
 
-        stateBeforePanelContainerModification = currentState;
-
         if (currentPanelContainerWidth === "0px") {
-            console.log("[reactToPanelContainerWidthModification] Initial width is 0px, setting to pinned with overlay saved");
+            console.log("[reactToPanelContainerWidthModification] Width is 0px (entering fullscreen), saving state");
+
+            // If previousState exists, it means the observer just saved the state before switching to PINNED
+            // Use that as the state to restore when exiting fullscreen
+            stateBeforePanelContainerModification = previousState || currentState;
+            console.log("[reactToPanelContainerWidthModification] Saved state:", stateBeforePanelContainerModification);
 
             setState(SIDEPANEL_STATES.PINNED);
         } else if (firstInit) {
@@ -559,8 +520,11 @@
             console.log("[reactToPanelContainerWidthModification] Initial width is not 0px, setting to overlay");
             setState(stateBeforePanelContainerModification || SIDEPANEL_STATES.OVERLAY);
         } else {
-            console.log("[reactToPanelContainerWidthModification] Initial width is not 0px, setting to pinned");
+            console.log("[reactToPanelContainerWidthModification] Width changed (exiting fullscreen), restoring state:", stateBeforePanelContainerModification);
             setState(stateBeforePanelContainerModification);
+
+            // Clear previousState to avoid conflicts with button click logic
+            previousState = null;
         }
     }
 
@@ -582,9 +546,6 @@
         }
         if (panelObserver) {
             panelObserver.disconnect();
-        }
-        if (bookmarksObserver) {
-            bookmarksObserver.disconnect();
         }
         if (noActiveButtonObserver) {
             noActiveButtonObserver.disconnect();
