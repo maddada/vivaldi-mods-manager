@@ -5,8 +5,6 @@
 # License: GPL
 #######################################################################
 
-# 2021-06-25 removed custom.css support
-# commented custom.css shell commands
 # users can now use vivaldi://experiments (v7.5 & older) or chrome://flags (v7.6+) to change CSS in UI
 
 mod_dir=$HOME/path/to/dir
@@ -41,7 +39,7 @@ echo "Patch originating from "${mod_dir}" targeting "${vivaldi_install_dirs[$sel
 sudo cp "$dir/resources/vivaldi/window.html" "$dir/resources/vivaldi/window.html-$(date +%Y-%m-%dT%H-%M-%S)"
 
 alreadypatched=$(grep '<script src="custom.js"></script>' $dir/resources/vivaldi/window.html);
-#alreadypatched=$(grep '<link rel="stylesheet" href="style/custom.css" />' $dir/resources/vivaldi/window.html);
+
 if [ "$alreadypatched" = "" ] ; then
     echo patching window.html
 	#sudo sed -i -e 's/<\/head>/<link rel="stylesheet" href="style\/custom.css" \/> <\/head>/' "$dir/resources/vivaldi/window.html"
@@ -50,16 +48,18 @@ else
         echo "window.html has already been patched!"
 fi
 
-#if [ -f "$mod_dir/custom.css" ] ; then
-#    echo copying custom.css
-#    sudo cp -f "$mod_dir/custom.css" "$dir/resources/vivaldi/style/custom.css"
-#else
-#    echo custom.css missing in $mod_dir
-#fi
-
 if [ -f "$mod_dir/custom.js" ] ; then
     echo copying custom.js
     sudo cp -f "$mod_dir/custom.js" "$dir/resources/vivaldi/custom.js"
 else
     echo custom.js missing in $mod_dir
+fi
+
+if ls "$mod_dir"/applied-js-mods/*.css 1> /dev/null 2>&1; then
+    for css_file in "$mod_dir"/applied-js-mods/*.css; do
+        echo "Copying ${css_file} to ${dir}/resources/vivaldi/"
+        sudo cp -f "${css_file}" "${dir}/resources/vivaldi/"
+    done
+else
+    echo "No CSS files found in applied-js-mods/, skipping"
 fi

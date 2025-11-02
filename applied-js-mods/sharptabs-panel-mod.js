@@ -1,76 +1,11 @@
 (function () {
     ("use strict");
 
-    // Settings that you can configure
-    const userConfig = {
-        expandDelay: 0, // time to wait before expanding the panel when mouse enters
-        collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-        animationSpeed: "0.2s", // animation speed for the panel
-    };
-
     // These shouldn't be changed unless you know what you're doing:
     const config = {
-        ...userConfig,
-        minimizedWidth: "77px",
-        expandedWidth: "260px",
-        fullWidth: "300px",
+        expandDelay: 0, // time to wait before expanding the panel when mouse enters
+        collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
     };
-
-    const styles = dedent(/*CSS*/ `
-        :root {
-            --width-full: ${config.fullWidth};
-            --width-minimized: ${config.minimizedWidth};
-            --width-hovered: ${config.expandedWidth};
-            --transition-web-panel: transform ${config.animationSpeed} ease-in-out, width ${config.animationSpeed} ease-in-out;
-        }
-        #panels-container.panel-expanded {
-            width: var(--width-full) !important;
-        }
-        #webview-container {
-            padding-left: 43px !important;
-        }
-        #panels-container:not(.panel-expanded) {
-            width: var(--width-minimized) !important;
-        }
-        #panels-container {
-            position: absolute !important;
-            transition: width ${config.animationSpeed} ease-in-out !important;
-            will-change: width;
-        }
-        .panel-collapse-guard {
-            min-width: var(--width-minimized) !important;
-            max-width: var(--width-hovered) !important;
-        }
-        #panels-container.panel-expanded {
-            width: var(--width-hovered) !important;
-        }
-
-        /* Make the side panel not resizeable in overlay mode */
-        /* Makes cursor not change when hovering side panel */
-        #panels-container > button.SlideBar--FullHeight {
-            display: none;
-        }
-
-        /* ========== WEB PANEL ========== */
-        div#panels-container {
-            transition: var(--transition-web-panel) !important;
-            will-change: width;
-            height: 100%;
-
-            &.left {
-                transform: translateX(calc(-100% + 43px));
-            }
-        }
-
-        #browser {
-            &:has(div#panels-container.left:hover),
-            &.tabs-left:has(div#panels-container.left):has(:is(.inner .tabbar-wrapper):hover) {
-                div#panels-container.left {
-                    transform: translateX(0);
-                }
-            }
-        }
-    `);
 
     // State constants
     const SIDEPANEL_STATES = {
@@ -110,7 +45,7 @@
         console.log("[init] Interval check running");
 
         panelsContainer = document.getElementById("panels-container");
-        toggleButton = document.querySelector("#panels #switch div.button-toolbar.toolbar-spacer-flexible");
+        toggleButton = document.querySelector(".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button");
 
         if (!panelsContainer) {
             return false;
@@ -138,6 +73,45 @@
 
     function markAsInitialized() {
         panelsContainer.setAttribute("data-mod-applied", "true");
+        applyPersistentButtonStyles();
+    }
+
+    function applyPersistentButtonStyles() {
+        // Add persistent styles for button that work in both PINNED and OVERLAY modes
+        const existingStyle = document.getElementById("vivaldi-toggle-button-persistent-styles");
+        if (existingStyle) return;
+
+        const styleElement = document.createElement("style");
+        styleElement.id = "vivaldi-toggle-button-persistent-styles";
+        styleElement.textContent = `
+            .button-toolbar.toolbar-spacer-panel button[data-mod-applied="true"] {
+                flex-basis: auto !important;
+            }
+
+            .mainbar .button-toolbar.toolbar-spacer-panel button[data-mod-applied="true"],
+            .mainbar .button-toolbar.toolbar-spacer button[data-mod-applied="true"] {
+                pointer-events: auto !important;
+                width: 34px !important;
+                min-width: 34px !important;
+                max-width: 34px !important;
+            }
+            .mainbar .button-toolbar.toolbar-spacer-panel button[data-mod-applied="true"] .button-icon,
+            .mainbar .button-toolbar.toolbar-spacer button[data-mod-applied="true"] .button-icon {
+                display: flex !important;
+                pointer-events: none !important;
+            }
+            /* Prevent transparent background override on hover */
+            #app .toolbar .toolbar-spacer-panel > button[data-mod-applied="true"]:hover,
+            #app .toolbar .toolbar-spacer > button[data-mod-applied="true"]:hover {
+                color: var(--colorFg);
+                background-color: var(--colorBgDark) !important;
+            }
+
+            #switch {
+                transition: opacity 0.3s ease-in-out !important;
+            }
+        `;
+        document.head.appendChild(styleElement);
     }
 
     // === STATE MANAGEMENT ===
@@ -163,7 +137,7 @@
                 break;
 
             case SIDEPANEL_STATES.OVERLAY:
-                applyStyles(config.minimizedWidth);
+                applyStyles();
                 addEventListeners();
                 addIconToToggleButton("▶︎");
                 console.log("[setState] Set state to OVERLAY");
@@ -172,14 +146,13 @@
     }
 
     // === STYLES ===
-    function applyStyles(sidebarWidth) {
-        console.log("[applyStyles] Applying styles with width:", sidebarWidth);
-
+    function applyStyles() {
         removeStyles();
 
-        const styleElement = document.createElement("style");
+        const styleElement = document.createElement("link");
         styleElement.id = "vivaldi-sidebar-styles";
-        styleElement.textContent = styles;
+        styleElement.rel = "stylesheet";
+        styleElement.href = "./sharptabs-panel-mod.css";
         document.head.appendChild(styleElement);
 
         console.log("[applyStyles] Styles applied successfully");
@@ -248,7 +221,7 @@
         clearTimeoutByType("expand");
 
         collapseTimeout = setTimeout(() => {
-            console.log("[handleMouseLeave] Collapsing panel after 200ms delay");
+            console.log(`[handleMouseLeave] Collapsing panel after ${config.collapseDelay}ms delay`);
             panelsContainer.classList.remove("panel-expanded");
             collapseTimeout = null;
         }, config.collapseDelay);
@@ -281,7 +254,7 @@
         console.log("[waitForToggleElement] Setting up mutation observer for toggle button");
 
         toggleObserver = new MutationObserver((mutations, obs) => {
-            toggleButton = document.querySelector("#panels #switch div.button-toolbar.toolbar-spacer-flexible");
+            toggleButton = document.querySelector(".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button");
             console.log("[waitForToggleElement] Checking for toggle button:", toggleButton);
 
             if (toggleButton) {
@@ -331,20 +304,51 @@
         });
     }
 
-    function addIconToToggleButton(icon, dataModValue = "true") {
+    function validateAndFixButton() {
+        if (!toggleButton) {
+            console.log("[validateAndFixButton] Toggle button not found, skipping validation");
+            return;
+        }
+
+        // Check if button is disabled or missing required attributes
+        const isDisabled = toggleButton.disabled;
+        const hasModApplied = toggleButton.getAttribute("data-mod-applied") === "true";
+        const hasIcon = toggleButton.querySelector(".button-icon");
+
+        if (isDisabled || !hasModApplied || !hasIcon) {
+            console.log("[validateAndFixButton] Button state broken, reinitializing. Disabled:", isDisabled, "HasModApplied:", hasModApplied, "HasIcon:", hasIcon);
+
+            // Re-apply the icon based on current state
+            const icon = currentState === SIDEPANEL_STATES.PINNED ? "⏺︎" : "▶︎";
+            addIconToToggleButton(icon);
+        }
+    }
+
+    function addIconToToggleButton(iconType, dataModValue = "true") {
         if (!toggleButton) return;
 
-        const svgContainer = document.createElement("div");
-        svgContainer.style.cssText = "display: flex; flex-direction: column; align-items: center; height: 100%;";
+        // Enable the button (remove disabled attribute)
+        toggleButton.disabled = false;
 
-        const svgElement = document.createElement("div");
-        svgElement.innerHTML = icon;
-        svgElement.style.cssText = "margin-top: 0; margin-bottom: auto;";
+        // Create SVG based on icon type
+        const svgHTML =
+            iconType === "⏺︎"
+                ? `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+                 <circle cx="13" cy="13" r="3.5" fill="currentColor"/>
+               </svg>`
+                : `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+                 <path d="M10 8l6 5-6 5V8z" fill="currentColor"/>
+               </svg>`;
 
-        svgContainer.appendChild(svgElement);
-        toggleButton.style = "padding-top: 5px;";
+        const buttonIconSpan = document.createElement("span");
+        buttonIconSpan.className = "button-icon";
+        buttonIconSpan.setAttribute("aria-hidden", "true");
+        buttonIconSpan.style.cssText = "display: flex !important; pointer-events: none !important;";
+        buttonIconSpan.innerHTML = svgHTML;
+
+        toggleButton.style = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
         toggleButton.innerHTML = "";
-        toggleButton.appendChild(svgContainer);
+        toggleButton.appendChild(buttonIconSpan);
         toggleButton.setAttribute("data-mod-applied", dataModValue);
     }
 
@@ -570,6 +574,7 @@
             // Set up periodic reinitialization check to handle sidepanel
             setInterval(() => {
                 init();
+                validateAndFixButton();
             }, 5000);
         }
     }

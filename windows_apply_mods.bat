@@ -44,6 +44,18 @@ echo   ^</body^> >> "%latestVersionFolder%\window.html"
 echo ^</html^> >> "%latestVersionFolder%\window.html"
 
 echo:
+echo ## 5- Copying css files that are in applied-js-mods folder
+
+if exist "applied-js-mods\*.css" (
+	for %%f in (applied-js-mods\*.css) do (
+		echo Copying %%f to %latestVersionFolder%
+		copy "%%f" "%latestVersionFolder%"
+	)
+) else (
+	echo No CSS files found in applied-js-mods/, skipping
+)
+
+echo:
 echo ## Done
 
 pause

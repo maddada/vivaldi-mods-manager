@@ -61,6 +61,17 @@ for path in "${FOUND_PATHS[@]}"; do
     echo '    <script src="custom.js"></script>' >> "${path}window.html"
     echo '  </body>' >> "${path}window.html"
     echo '</html>' >> "${path}window.html"
+
+    echo "## 5- Copying css files that are in applied-js-mods folder"
+
+    if ls ./applied-js-mods/*.css 1> /dev/null 2>&1; then
+        for css_file in ./applied-js-mods/*.css; do
+            echo "Copying ${css_file} to ${path}"
+            cp "${css_file}" "${path}"
+        done
+    else
+        echo "No CSS files found in applied-js-mods/, skipping"
+    fi
 done
 
 echo
