@@ -9,8 +9,8 @@
     then adjust these values like shown in the video: */
 
     --shift-vivaldi-panel-bar-left-collapsed: -33px;
-    --shift-vivaldi-panel-bar-left-expanded: 44px;
-    --shift-vivaldi-page: 44px;
+    --shift-vivaldi-panel-bar-left-expanded: 39px;
+    --shift-vivaldi-page: 39px;
 
     .density-on {
         --shift-vivaldi-panel-bar-left-collapsed: -40px !important;
