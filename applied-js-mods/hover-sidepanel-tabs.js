@@ -1,29 +1,79 @@
 (function () {
-    "use strict";
+    ("use strict");
 
     // Settings that you can configure
     const userConfig = {
         expandDelay: 0, // time to wait before expanding the panel when mouse enters
         collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-        transitionAnimation: "0.2s ease-in-out", // animation speed for the panel
+        animationSpeed: "0.2s", // animation speed for the panel
     };
 
     // These shouldn't be changed unless you know what you're doing:
     const config = {
         ...userConfig,
-        reinitInterval: 5000,
-        initCheckInterval: 800,
         minimizedWidth: "76px",
         expandedWidth: "260px",
         fullWidth: "300px",
     };
 
+    const styles = dedent(/*CSS*/ `
+        :root {
+            --width-full: ${config.fullWidth};
+            --width-minimized: ${sidebarWidth};
+            --width-hovered: ${config.expandedWidth};
+            --transition-web-panel: transform ${config.animationSpeed} ease-in-out, width ${config.animationSpeed} ease-in-out;
+        }
+        #panels-container.panel-expanded {
+            width: var(--width-full) !important;
+        }
+        #webview-container {
+            padding-left: 43px !important;
+        }
+        #panels-container:not(.panel-expanded) {
+            width: var(--width-minimized) !important;
+        }
+        #panels-container {
+            position: absolute !important;
+            transition: width ${config.animationSpeed} ease-in-out !important;
+            will-change: width;
+        }
+        .panel-collapse-guard {
+            min-width: var(--width-minimized) !important;
+            max-width: var(--width-hovered) !important;
+        }
+        #panels-container.panel-expanded {
+            width: var(--width-hovered) !important;
+        }
+
+        /* Make the side panel not resizeable in overlay mode */
+        /* Makes cursor not change when hovering side panel */
+        #panels-container > button.SlideBar--FullHeight {
+            display: none;
+        }
+
+        /* ========== WEB PANEL ========== */
+        div#panels-container {
+            transition: var(--transition-web-panel) !important;
+            will-change: width;
+            height: 100%;
+
+            &.left {
+                transform: translateX(calc(-100% + 43px));
+            }
+        }
+
+        #browser {
+            &:has(div#panels-container.left:hover),
+            &.tabs-left:has(div#panels-container.left):has(:is(.inner .tabbar-wrapper):hover) {
+                div#panels-container.left {
+                    transform: translateX(0);
+                }
+            }
+        }
+    `);
+
     function isBookmarksBarEnabled() {
         return document.querySelector("#main > div.bookmark-bar.default") !== null;
-    }
-
-    function calculateHeight() {
-        return `calc(100vh - 83px ${!isBookmarksBarEnabled() ? "+ 29px" : ""})`;
     }
 
     // State constants
@@ -132,39 +182,6 @@
         console.log("[applyStyles] Applying styles with width:", sidebarWidth);
 
         removeStyles();
-
-        const styles = dedent(
-            /*CSS*/ `
-            :root {
-                --width-1: ${config.fullWidth};
-                --width-minimized: ${sidebarWidth};
-                --width-hovered: ${config.expandedWidth};
-            }
-            #panels-container.panel-expanded {
-                width: var(--width-1) !important;
-            }
-            #webview-container {
-                padding-left: 43px !important;
-            }
-            #panels-container:not(.panel-expanded) {
-                width: var(--width-minimized) !important;
-            }
-            #panels-container {
-                position: absolute !important;
-                height: ${calculateHeight()} !important;
-                transition: width ${config.transitionAnimation} !important;
-                will-change: width;
-            }
-            .panel-collapse-guard {
-                min-width: var(--width-minimized) !important;
-                max-width: var(--width-hovered) !important;
-            }
-            #panels-container.panel-expanded {
-                width: var(--width-hovered) !important;
-            }
-
-        ` + window.vivazenStyles
-        );
 
         const styleElement = document.createElement("style");
         styleElement.id = "vivaldi-sidebar-styles";
@@ -413,7 +430,7 @@
 
         noActiveButtonObserver = new MutationObserver(() => {
             // Check if there are no active buttons
-            const hasActiveButton = toolbarElement.querySelector('.button-toolbar.active');
+            const hasActiveButton = toolbarElement.querySelector(".button-toolbar.active");
 
             if (!hasActiveButton && currentState === SIDEPANEL_STATES.OVERLAY) {
                 console.log("[setupNoActiveButtonObserver] No active buttons detected while in OVERLAY mode, switching to PINNED");
@@ -430,7 +447,7 @@
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ['class'],
+            attributeFilter: ["class"],
         });
 
         console.log("[setupNoActiveButtonObserver] No active button observer started");
@@ -592,13 +609,13 @@
             // Set up periodic reinitialization check to handle sidepanel
             setInterval(() => {
                 init();
-            }, config.reinitInterval);
+            }, 5000);
         }
     }
 
     // === SCRIPT ENTRY POINT ===
     console.log("[SCRIPT START] Vivaldi Sidebar Manager starting execution. Looking for panels-container to initialize styles on it.");
-    initInterval = setInterval(initializeManager, config.initCheckInterval);
+    initInterval = setInterval(initializeManager, 800);
 })();
 
 function dedent(css) {

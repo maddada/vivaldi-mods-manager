@@ -36,7 +36,7 @@ echo:
 echo ## 4- Copying js files and Patching window.html
 
 echo copying js files code to custom.js
-type *.js > "%latestVersionFolder%\custom.js"
+type "applied-js-mods\*.js" > "%latestVersionFolder%\custom.js"
 
 type "%latestVersionFolder%\window.bak.html" | findstr /v "</body>" | findstr /v "</html>" > "%latestVersionFolder%\window.html"
 echo     ^<script src="custom.js"^>^</script^> >> "%latestVersionFolder%\window.html"
