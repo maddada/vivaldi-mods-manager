@@ -11,6 +11,12 @@
     --shift-vivaldi-panel-bar-left-collapsed: -33px;
     --shift-vivaldi-panel-bar-left-expanded: 44px;
     --shift-vivaldi-page: 44px;
+
+    .density-on {
+        --shift-vivaldi-panel-bar-left-collapsed: -40px !important;
+        --shift-vivaldi-panel-bar-left-expanded: 38px !important;
+        --shift-vivaldi-page: 38px !important;
+    }
 }
 
 /* When the panel collapse styles are active, hide the panel's buttons */
