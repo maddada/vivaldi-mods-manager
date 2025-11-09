@@ -33,6 +33,7 @@
     // === STATE VARIABLES ===
     let currentState = SIDEPANEL_STATES.FIXED;
     let previousState = null;
+    let lastActiveMode = SIDEPANEL_STATES.FIXED; // Track last non-inactive mode (Fixed or Hover)
     let transitionGracePeriod = false;
     let stateBeforePanelContainerModification = null;
     let firstInit = true;
@@ -40,10 +41,17 @@
     // DOM elements
     let panelsContainer = null;
     let toggleButton = null;
+    let appElement = null;
 
     // Observers
     let toggleObserver = null;
     let noActiveButtonObserver = null;
+
+    // CSS Classes for modes
+    const MODE_CLASSES = {
+        [SIDEPANEL_STATES.FIXED]: "sharptabs-fixed-mode",
+        [SIDEPANEL_STATES.HOVER]: "sharptabs-hover-mode",
+    };
 
     // === INITIALIZATION ===
     function init() {
@@ -51,14 +59,16 @@
 
         panelsContainer = document.getElementById("panels-container");
         toggleButton = document.querySelector(SELECTORS.TOGGLE_BUTTON);
+        appElement = document.getElementById("app");
 
         log("init", "Elements found", {
             panelsContainer: !!panelsContainer,
             toggleButton: !!toggleButton,
+            appElement: !!appElement,
             toggleButtonSelector: SELECTORS.TOGGLE_BUTTON
         });
 
-        if (!panelsContainer) {
+        if (!panelsContainer || !appElement) {
             return false;
         }
 
@@ -88,6 +98,7 @@
     function markAsInitialized() {
         panelsContainer.setAttribute("data-mod-applied", "true");
         applyPersistentButtonStyles();
+        loadModeStyles();
     }
 
     function applyPersistentButtonStyles() {
@@ -126,6 +137,22 @@
         document.head.appendChild(styleElement);
     }
 
+    function loadModeStyles() {
+        const existingStyle = document.getElementById("vivaldi-sharptabs-mode-styles");
+        if (existingStyle) {
+            log("loadModeStyles", "Styles already loaded");
+            return;
+        }
+
+        const styleElement = document.createElement("link");
+        styleElement.id = "vivaldi-sharptabs-mode-styles";
+        styleElement.rel = "stylesheet";
+        styleElement.href = "./sharptabs-panel-modes.css";
+        document.head.appendChild(styleElement);
+
+        log("loadModeStyles", "Mode styles loaded successfully");
+    }
+
     // === STATE MANAGEMENT ===
     function setState(newState) {
         const wasInactive = currentState === SIDEPANEL_STATES.INACTIVE;
@@ -142,15 +169,18 @@
         if (newState === SIDEPANEL_STATES.INACTIVE) {
             destroy();
             panelsContainer.classList.remove("panel-expanded");
+            removeModeClasses();
             addIconToToggleButton(ICONS.INACTIVE);
             log("setState", "Set state to INACTIVE");
         } else if (newState === SIDEPANEL_STATES.HOVER) {
-            applyStyles(SIDEPANEL_STATES.HOVER);
+            lastActiveMode = SIDEPANEL_STATES.HOVER; // Remember this mode
+            setModeClass(SIDEPANEL_STATES.HOVER);
             addEventListeners();
             addIconToToggleButton(ICONS.HOVER);
             log("setState", "Set state to HOVER");
         } else if (newState === SIDEPANEL_STATES.FIXED) {
-            applyStyles(SIDEPANEL_STATES.FIXED);
+            lastActiveMode = SIDEPANEL_STATES.FIXED; // Remember this mode
+            setModeClass(SIDEPANEL_STATES.FIXED);
             addEventListeners();
             addIconToToggleButton(ICONS.FIXED);
             log("setState", "Set state to FIXED");
@@ -158,23 +188,31 @@
     }
 
     // === STYLES ===
-    function applyStyles(mode) {
-        removeStyles();
+    function setModeClass(mode) {
+        if (!appElement) {
+            log("setModeClass", "App element not found!");
+            return;
+        }
 
-        const cssFile = mode === SIDEPANEL_STATES.FIXED ? "./sharptabs-fixed-mode.css" : "./sharptabs-hover-mode.css";
+        // Remove all mode classes first
+        removeModeClasses();
 
-        const styleElement = document.createElement("link");
-        styleElement.id = "vivaldi-sidebar-styles";
-        styleElement.rel = "stylesheet";
-        styleElement.href = cssFile;
-        document.head.appendChild(styleElement);
-
-        log("applyStyles", "Styles applied successfully", cssFile);
+        // Add the new mode class
+        const modeClass = MODE_CLASSES[mode];
+        if (modeClass) {
+            appElement.classList.add(modeClass);
+            log("setModeClass", "Mode class applied", { mode, modeClass });
+        }
     }
 
-    function removeStyles() {
-        const existingStyle = document.getElementById("vivaldi-sidebar-styles");
-        if (existingStyle) existingStyle.remove();
+    function removeModeClasses() {
+        if (!appElement) return;
+
+        Object.values(MODE_CLASSES).forEach(className => {
+            appElement.classList.remove(className);
+        });
+
+        log("removeModeClasses", "All mode classes removed");
     }
 
     // === EVENT LISTENERS ===
@@ -239,7 +277,7 @@
     function waitForToggleElement() {
         log("waitForToggleElement", "Setting up mutation observer for toggle button");
 
-        toggleObserver = new MutationObserver((mutations, obs) => {
+        toggleObserver = new MutationObserver((_mutations, obs) => {
             toggleButton = document.querySelector(SELECTORS.TOGGLE_BUTTON);
 
             if (toggleButton) {
@@ -286,10 +324,27 @@
                 currentState = SIDEPANEL_STATES.INACTIVE;
             }
 
-            // For auxclick event (middle/right click)
+            // For auxclick event (middle click)
             if (e.type === "auxclick" && e.button === 1) {
-                log("toggleButton", "Middle clicked - switching to INACTIVE");
-                setState(SIDEPANEL_STATES.INACTIVE);
+                let nextState;
+
+                if (currentState === SIDEPANEL_STATES.INACTIVE) {
+                    // Restore last active mode (Fixed or Hover)
+                    nextState = lastActiveMode;
+                    log("toggleButton", "Middle clicked from INACTIVE - restoring last active mode:", lastActiveMode);
+                } else {
+                    // From Fixed or Hover, go to Inactive
+                    nextState = SIDEPANEL_STATES.INACTIVE;
+                    log("toggleButton", "Middle clicked - switching to INACTIVE");
+                }
+
+                // Only allow transitioning to FIXED or HOVER if Sharp Tabs is active
+                if ((nextState === SIDEPANEL_STATES.HOVER || nextState === SIDEPANEL_STATES.FIXED) && !getActiveSharpTabsButton()) {
+                    log("toggleButton", "Cannot transition to HOVER/FIXED - no active Sharp Tabs button");
+                    return;
+                }
+
+                setState(nextState);
                 return;
             }
 
@@ -297,13 +352,17 @@
             if (e.type === "click" || (e.type === "mousedown" && e.button === 0)) {
                 log("toggleButton", "Left clicked");
 
-                const transitions = {
-                    [SIDEPANEL_STATES.INACTIVE]: SIDEPANEL_STATES.FIXED,
-                    [SIDEPANEL_STATES.FIXED]: SIDEPANEL_STATES.HOVER,
-                    [SIDEPANEL_STATES.HOVER]: SIDEPANEL_STATES.FIXED,
-                };
+                let nextState;
 
-                const nextState = transitions[currentState];
+                if (currentState === SIDEPANEL_STATES.INACTIVE) {
+                    // Restore last active mode (Fixed or Hover)
+                    nextState = lastActiveMode;
+                    log("toggleButton", "Restoring last active mode:", lastActiveMode);
+                } else if (currentState === SIDEPANEL_STATES.FIXED) {
+                    nextState = SIDEPANEL_STATES.HOVER;
+                } else if (currentState === SIDEPANEL_STATES.HOVER) {
+                    nextState = SIDEPANEL_STATES.FIXED;
+                }
 
                 // Only allow transitioning to FIXED or HOVER if Sharp Tabs is active
                 if ((nextState === SIDEPANEL_STATES.HOVER || nextState === SIDEPANEL_STATES.FIXED) && !getActiveSharpTabsButton()) {
@@ -446,7 +505,7 @@
         });
     }
 
-    function handleSharpTabsButtonClick(button) {
+    function handleSharpTabsButtonClick(_button) {
         log("handleSharpTabsButtonClick", "Sharp Tabs button clicked");
 
         if (getActiveSharpTabsButton()) {
@@ -520,7 +579,7 @@
             noActiveButtonObserver.disconnect();
         }
 
-        removeStyles();
+        removeModeClasses();
         log("destroy", "Sidebar manager destroyed");
     }
 
