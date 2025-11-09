@@ -1,66 +1,80 @@
 (function () {
     ("use strict");
 
-    // These shouldn't be changed unless you know what you're doing:
-    const config = {
-        expandDelay: 0, // time to wait before expanding the panel when mouse enters
-        collapseDelay: 0, // time to wait before collapsing the panel when mouse leaves
-    };
-
-    // State constants
     const SIDEPANEL_STATES = {
-        PINNED: "pinned",
-        OVERLAY: "overlay",
+        INACTIVE: "inactive",
+        HOVER: "hover",
+        FIXED: "fixed",
     };
 
-    let firstInit = true;
+    const SELECTORS = {
+        PANELS_CONTAINER: "#panels-container",
+        TOGGLE_BUTTON: ".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button",
+        TOOLBAR: "#panels > #switch > div.toolbar",
+        ACTIVE_BUTTON: ".button-toolbar.active",
+        SHARP_TABS_BUTTON: '.button-toolbar.active > button[aria-label^="Sharp Tabs"], .button-toolbar.active > button[aria-label*="/sb.html"]',
+    };
 
-    // Sidepanel state management
-    let currentState = SIDEPANEL_STATES.OVERLAY;
+    const ICONS = {
+        INACTIVE: "⏺︎",
+        HOVER: "▶︎",
+        FIXED: "■",
+    };
+
+    const PANEL_WIDTH = {
+        CLOSED: "35px",
+        COLLAPSED: "0px",
+    };
+
+    const log = (context, message, ...args) => {
+        console.log(`[${context}] ${message}`, ...args);
+    };
+
+    // === STATE VARIABLES ===
+    let currentState = SIDEPANEL_STATES.FIXED;
     let previousState = null;
     let transitionGracePeriod = false;
-
-    let buttonClicked = false;
-    let alreadyRanReactToPanelContainerWidthModification = false;
-
-    // Panel Container state management
     let stateBeforePanelContainerModification = null;
-
-    // Timeouts
-    let expandTimeout = null;
-    let collapseTimeout = null;
+    let firstInit = true;
 
     // DOM elements
     let panelsContainer = null;
     let toggleButton = null;
 
     // Observers
-    let buttonObserver = null;
     let toggleObserver = null;
-    let panelObserver = null;
     let noActiveButtonObserver = null;
 
     // === INITIALIZATION ===
     function init() {
-        console.log("[init] Interval check running");
+        log("init", "Interval check running");
 
         panelsContainer = document.getElementById("panels-container");
-        toggleButton = document.querySelector(".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button");
+        toggleButton = document.querySelector(SELECTORS.TOGGLE_BUTTON);
+
+        log("init", "Elements found", {
+            panelsContainer: !!panelsContainer,
+            toggleButton: !!toggleButton,
+            toggleButtonSelector: SELECTORS.TOGGLE_BUTTON
+        });
 
         if (!panelsContainer) {
             return false;
         }
 
-        if (isAlreadyInitialized()) {
-            console.log("[init] Already loaded, skipping initialization");
+        const alreadyInit = isAlreadyInitialized();
+
+        if (alreadyInit) {
+            log("init", "Already loaded, but checking toggle button");
+            // Even if already initialized, ensure toggle button listener is attached
+            setupToggleButton();
             return true;
         }
 
-        console.log("[init] Found panels-container, initializing");
-        reactToPanelContainerWidthModification();
+        log("init", "Found panels-container, initializing");
+        initializePanel();
         markAsInitialized();
         setupToggleButton();
-        setupPanelWidthObserver();
         setupNoActiveButtonObserver();
         setupToolbarClickListener();
 
@@ -77,7 +91,6 @@
     }
 
     function applyPersistentButtonStyles() {
-        // Add persistent styles for button that work in both PINNED and OVERLAY modes
         const existingStyle = document.getElementById("vivaldi-toggle-button-persistent-styles");
         if (existingStyle) return;
 
@@ -100,7 +113,6 @@
                 display: flex !important;
                 pointer-events: none !important;
             }
-            /* Prevent transparent background override on hover */
             #app .toolbar .toolbar-spacer-panel > button[data-mod-applied="true"]:hover,
             #app .toolbar .toolbar-spacer > button[data-mod-applied="true"]:hover {
                 color: var(--colorFg);
@@ -116,46 +128,48 @@
 
     // === STATE MANAGEMENT ===
     function setState(newState) {
-        const wasPinned = currentState === SIDEPANEL_STATES.PINNED;
-        const becomingOverlay = newState === SIDEPANEL_STATES.OVERLAY;
+        const wasInactive = currentState === SIDEPANEL_STATES.INACTIVE;
+        const becomingHover = newState === SIDEPANEL_STATES.HOVER;
+        const becomingFixed = newState === SIDEPANEL_STATES.FIXED;
 
-        // Set grace period when transitioning from PINNED to OVERLAY
-        if (wasPinned && becomingOverlay) {
+        if (wasInactive && (becomingHover || becomingFixed)) {
             transitionGracePeriod = true;
-            console.log("[setState] Enabling transition grace period");
+            log("setState", "Enabling transition grace period");
         }
 
         currentState = newState;
 
-        switch (newState) {
-            case SIDEPANEL_STATES.PINNED:
-                removeEventListeners();
-                removeStyles();
-                panelsContainer.classList.remove("panel-expanded");
-                addIconToToggleButton("⏺︎");
-                console.log("[setState] Set state to PINNED");
-                break;
-
-            case SIDEPANEL_STATES.OVERLAY:
-                applyStyles();
-                addEventListeners();
-                addIconToToggleButton("▶︎");
-                console.log("[setState] Set state to OVERLAY");
-                break;
+        if (newState === SIDEPANEL_STATES.INACTIVE) {
+            destroy();
+            panelsContainer.classList.remove("panel-expanded");
+            addIconToToggleButton(ICONS.INACTIVE);
+            log("setState", "Set state to INACTIVE");
+        } else if (newState === SIDEPANEL_STATES.HOVER) {
+            applyStyles(SIDEPANEL_STATES.HOVER);
+            addEventListeners();
+            addIconToToggleButton(ICONS.HOVER);
+            log("setState", "Set state to HOVER");
+        } else if (newState === SIDEPANEL_STATES.FIXED) {
+            applyStyles(SIDEPANEL_STATES.FIXED);
+            addEventListeners();
+            addIconToToggleButton(ICONS.FIXED);
+            log("setState", "Set state to FIXED");
         }
     }
 
     // === STYLES ===
-    function applyStyles() {
+    function applyStyles(mode) {
         removeStyles();
+
+        const cssFile = mode === SIDEPANEL_STATES.FIXED ? "./sharptabs-fixed-mode.css" : "./sharptabs-hover-mode.css";
 
         const styleElement = document.createElement("link");
         styleElement.id = "vivaldi-sidebar-styles";
         styleElement.rel = "stylesheet";
-        styleElement.href = "./sharptabs-panel-mod.css";
+        styleElement.href = cssFile;
         document.head.appendChild(styleElement);
 
-        console.log("[applyStyles] Styles applied successfully");
+        log("applyStyles", "Styles applied successfully", cssFile);
     }
 
     function removeStyles() {
@@ -165,103 +179,73 @@
 
     // === EVENT LISTENERS ===
     function addEventListeners() {
-        console.log("[addEventListeners] Adding event listeners");
+        log("addEventListeners", "Adding event listeners");
         panelsContainer.addEventListener("mouseenter", handleMouseEnter);
         panelsContainer.addEventListener("mouseleave", handleMouseLeave);
-        console.log("[addEventListeners] Event listeners added");
     }
 
     function removeEventListeners() {
-        console.log("[removeEventListeners] Removing event listeners");
+        log("removeEventListeners", "Removing event listeners");
         panelsContainer.removeEventListener("mouseenter", handleMouseEnter);
         panelsContainer.removeEventListener("mouseleave", handleMouseLeave);
-        console.log("[removeEventListeners] Event listeners removed");
     }
 
     // === MOUSE EVENTS ===
     function handleMouseEnter() {
-        console.log("[handleMouseEnter] Mouse enter event triggered, current state:", currentState, "grace period:", transitionGracePeriod);
-        if (currentState === SIDEPANEL_STATES.PINNED) return;
+        log("handleMouseEnter", "Triggered", { currentState, gracePeriod: transitionGracePeriod });
 
-        // Skip expansion during grace period
+        if (currentState === SIDEPANEL_STATES.INACTIVE) return;
         if (transitionGracePeriod) {
-            console.log("[handleMouseEnter] Skipping due to transition grace period");
+            log("handleMouseEnter", "Skipping due to transition grace period");
             return;
         }
-
-        clearTimeoutByType("collapse");
 
         if (!getActiveSharpTabsButton()) {
-            console.log("[handleMouseEnter] No active button found, skipping expansion");
+            log("handleMouseEnter", "No active button found, skipping expansion");
             return;
         }
 
-        if (panelsContainer.classList.contains("panel-expanded")) {
-            console.log("[handleMouseEnter] Panel already expanded, skipping timeout");
-            return;
-        }
-
-        expandTimeout = setTimeout(() => {
-            console.log("[handleMouseEnter] Expanding panel after 20ms delay");
+        if (!panelsContainer.classList.contains("panel-expanded")) {
             panelsContainer.classList.add("panel-expanded");
-            expandTimeout = null;
-        }, config.expandDelay);
+        }
     }
 
     function handleMouseLeave() {
-        console.log("[handleMouseLeave] Mouse leave event triggered, current state:", currentState);
-        if (currentState === SIDEPANEL_STATES.PINNED) return;
+        log("handleMouseLeave", "Triggered", { currentState });
 
-        // Clear grace period when mouse leaves
+        if (currentState === SIDEPANEL_STATES.INACTIVE) return;
+
         if (transitionGracePeriod) {
             transitionGracePeriod = false;
-            console.log("[handleMouseLeave] Transition grace period cleared");
+            log("handleMouseLeave", "Transition grace period cleared");
         }
 
-        clearTimeoutByType("expand");
-
-        collapseTimeout = setTimeout(() => {
-            console.log(`[handleMouseLeave] Collapsing panel after ${config.collapseDelay}ms delay`);
-            panelsContainer.classList.remove("panel-expanded");
-            collapseTimeout = null;
-        }, config.collapseDelay);
-    }
-
-    function clearTimeoutByType(type) {
-        if (type === "expand" && expandTimeout) {
-            clearTimeout(expandTimeout);
-            expandTimeout = null;
-            console.log("[clearTimeoutByType] Cleared expand timeout");
-        }
-        if (type === "collapse" && collapseTimeout) {
-            clearTimeout(collapseTimeout);
-            collapseTimeout = null;
-            console.log("[clearTimeoutByType] Cleared collapse timeout");
-        }
+        panelsContainer.classList.remove("panel-expanded");
     }
 
     // === TOGGLE BUTTON ===
     function setupToggleButton() {
+        log("setupToggleButton", "Called", { buttonExists: !!toggleButton });
         if (toggleButton) {
+            log("setupToggleButton", "Button found, attaching listeners");
             attachToggleListeners();
             return;
         }
 
+        log("setupToggleButton", "Button not found, waiting for it");
         waitForToggleElement();
     }
 
     function waitForToggleElement() {
-        console.log("[waitForToggleElement] Setting up mutation observer for toggle button");
+        log("waitForToggleElement", "Setting up mutation observer for toggle button");
 
         toggleObserver = new MutationObserver((mutations, obs) => {
-            toggleButton = document.querySelector(".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button");
-            console.log("[waitForToggleElement] Checking for toggle button:", toggleButton);
+            toggleButton = document.querySelector(SELECTORS.TOGGLE_BUTTON);
 
             if (toggleButton) {
-                console.log("[waitForToggleElement] Toggle button found, adding click listeners");
+                log("waitForToggleElement", "Toggle button found");
                 attachToggleListeners();
                 obs.disconnect();
-                console.log("[waitForToggleElement] Toggle button found and click listeners attached");
             }
         });
 
@@ -269,76 +253,125 @@
             childList: true,
             subtree: true,
         });
-
-        console.log("[waitForToggleElement] Mutation observer started");
     }
 
     function attachToggleListeners() {
-        toggleButton.addEventListener("click", (e) => {
-            console.log("[attachToggleListeners] Toggle button clicked");
-            e.preventDefault();
-
-            console.log("[handleLeftClick] Left click - current state:", currentState);
-
-            // temp fix for bug
-            if (!currentState) currentState = SIDEPANEL_STATES.PINNED;
-
-            // Toggle between PINNED and OVERLAY
-            const transitions = {
-                [SIDEPANEL_STATES.PINNED]: SIDEPANEL_STATES.OVERLAY,
-                [SIDEPANEL_STATES.OVERLAY]: SIDEPANEL_STATES.PINNED,
-            };
-
-            const nextState = transitions[currentState];
-
-            // Only allow transitioning to OVERLAY if Sharp Tabs is active
-            if (nextState === SIDEPANEL_STATES.OVERLAY && !getActiveSharpTabsButton()) {
-                console.log("[handleLeftClick] Cannot transition to OVERLAY - no active Sharp Tabs button");
-                return;
-            }
-
-            if (nextState === SIDEPANEL_STATES.PINNED) {
-                console.log("[handleLeftClick] Setting state to PINNED from handleLeftClick function");
-            }
-            setState(nextState);
-        });
-    }
-
-    function validateAndFixButton() {
-        if (!toggleButton) {
-            console.log("[validateAndFixButton] Toggle button not found, skipping validation");
+        // Only attach if not already attached
+        if (toggleButton.hasAttribute("data-listener-attached")) {
+            log("attachToggleListeners", "Listener already attached, skipping");
             return;
         }
 
-        // Check if button is disabled or missing required attributes
-        const isDisabled = toggleButton.disabled;
-        const hasModApplied = toggleButton.getAttribute("data-mod-applied") === "true";
-        const hasIcon = toggleButton.querySelector(".button-icon");
+        log("attachToggleListeners", "Attaching listeners to button", {
+            tagName: toggleButton.tagName,
+            className: toggleButton.className,
+            disabled: toggleButton.disabled,
+            style: toggleButton.getAttribute("style")
+        });
 
-        if (isDisabled || !hasModApplied || !hasIcon) {
-            console.log("[validateAndFixButton] Button state broken, reinitializing. Disabled:", isDisabled, "HasModApplied:", hasModApplied, "HasIcon:", hasIcon);
+        const handleClick = (e) => {
+            log("toggleButton", "Event triggered", {
+                type: e.type,
+                button: e.button,
+                currentState,
+                target: e.target.tagName,
+                currentTarget: e.currentTarget.tagName
+            });
 
-            // Re-apply the icon based on current state
-            const icon = currentState === SIDEPANEL_STATES.PINNED ? "⏺︎" : "▶︎";
-            addIconToToggleButton(icon);
-        }
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Ensure currentState is initialized
+            if (!currentState) {
+                currentState = SIDEPANEL_STATES.INACTIVE;
+            }
+
+            // For auxclick event (middle/right click)
+            if (e.type === "auxclick" && e.button === 1) {
+                log("toggleButton", "Middle clicked - switching to INACTIVE");
+                setState(SIDEPANEL_STATES.INACTIVE);
+                return;
+            }
+
+            // For click event (left click only)
+            if (e.type === "click" || (e.type === "mousedown" && e.button === 0)) {
+                log("toggleButton", "Left clicked");
+
+                const transitions = {
+                    [SIDEPANEL_STATES.INACTIVE]: SIDEPANEL_STATES.FIXED,
+                    [SIDEPANEL_STATES.FIXED]: SIDEPANEL_STATES.HOVER,
+                    [SIDEPANEL_STATES.HOVER]: SIDEPANEL_STATES.FIXED,
+                };
+
+                const nextState = transitions[currentState];
+
+                // Only allow transitioning to FIXED or HOVER if Sharp Tabs is active
+                if ((nextState === SIDEPANEL_STATES.HOVER || nextState === SIDEPANEL_STATES.FIXED) && !getActiveSharpTabsButton()) {
+                    log("toggleButton", "Cannot transition to HOVER/FIXED - no active Sharp Tabs button");
+                    return;
+                }
+
+                setState(nextState);
+            }
+        };
+
+        // Try multiple event types to ensure we catch the click
+        toggleButton.addEventListener("click", handleClick, true);
+        toggleButton.addEventListener("auxclick", handleClick, true);
+        toggleButton.addEventListener("mousedown", handleClick, true);
+
+        toggleButton.setAttribute("data-listener-attached", "true");
+        log("attachToggleListeners", "Listeners attached successfully");
+
+        // Test if events work at all
+        setTimeout(() => {
+            log("attachToggleListeners", "Testing button responsiveness", {
+                hasListeners: toggleButton.hasAttribute("data-listener-attached"),
+                buttonElement: toggleButton
+            });
+        }, 1000);
+
+        // Add a global listener to detect if clicks are happening at all
+        document.addEventListener("mousedown", (e) => {
+            if (e.target === toggleButton || toggleButton.contains(e.target)) {
+                log("GLOBAL LISTENER", "Click detected on toggle button area", {
+                    target: e.target.tagName,
+                    button: e.button,
+                    toggleButtonMatches: e.target === toggleButton
+                });
+            }
+        }, true);
     }
 
-    function addIconToToggleButton(iconType, dataModValue = "true") {
+    function addIconToToggleButton(iconType) {
+        log("addIconToToggleButton", "Called", { iconType, buttonExists: !!toggleButton });
         if (!toggleButton) return;
 
-        // Enable the button (remove disabled attribute)
         toggleButton.disabled = false;
+        toggleButton.style = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
 
-        // Create SVG based on icon type
-        const svgHTML =
-            iconType === "⏺︎"
-                ? `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
-                 <circle cx="13" cy="13" r="3.5" fill="currentColor"/>
-               </svg>`
-                : `<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
-                 <path d="M10 8l6 5-6 5V8z" fill="currentColor"/>
-               </svg>`;
+        let svgHTML;
+        switch (iconType) {
+            case ICONS.INACTIVE:
+                svgHTML = `
+                <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="13" cy="13" r="3.5" fill="currentColor"/>
+                </svg>`;
+                break;
+            case ICONS.FIXED:
+                svgHTML = `
+                <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="9" y="9" width="8" height="8" fill="currentColor"/>
+                </svg>`;
+                break;
+            case ICONS.HOVER:
+            default:
+                svgHTML = `
+                <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 8l6 5-6 5V8z" fill="currentColor"/>
+                </svg>`;
+                break;
+        }
 
         const buttonIconSpan = document.createElement("span");
         buttonIconSpan.className = "button-icon";
@@ -346,62 +379,36 @@
         buttonIconSpan.style.cssText = "display: flex !important; pointer-events: none !important;";
         buttonIconSpan.innerHTML = svgHTML;
 
-        toggleButton.style = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
         toggleButton.innerHTML = "";
         toggleButton.appendChild(buttonIconSpan);
-        toggleButton.setAttribute("data-mod-applied", dataModValue);
-    }
+        toggleButton.setAttribute("data-mod-applied", "true");
 
-    function setupPanelWidthObserver() {
-        console.log("[setupPanelWidthObserver] Setting up panel width observer");
-
-        // Create observer to watch for style changes on panels-container
-        panelObserver = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                console.log("[setupPanelWidthObserver] Panel element changed, mutation details:", mutation);
-                if (mutation.type === "attributes" && mutation.attributeName === "style") {
-                    setTimeout(() => {
-                        if (!alreadyRanReactToPanelContainerWidthModification) {
-                            reactToPanelContainerWidthModification();
-                            alreadyRanReactToPanelContainerWidthModification = true;
-                            setTimeout(() => {
-                                alreadyRanReactToPanelContainerWidthModification = false;
-                            }, 100);
-                        }
-                    }, 50);
-                }
-            });
-        });
-
-        // Start observing
-        panelObserver.observe(panelsContainer, {
-            attributes: true,
-            attributeFilter: ["style"],
-        });
-
-        console.log("[setupPanelWidthObserver] Panel width observer started");
+        // Ensure listeners are still attached after modifying the button
+        // Remove the listener-attached flag so it can be re-attached if needed
+        if (!toggleButton.hasAttribute("data-listener-attached")) {
+            log("addIconToToggleButton", "Listeners not attached, attaching now");
+            attachToggleListeners();
+        }
     }
 
     function setupNoActiveButtonObserver() {
-        const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
+        const toolbarElement = document.querySelector(SELECTORS.TOOLBAR);
 
         if (!toolbarElement) {
-            console.log("[setupNoActiveButtonObserver] Toolbar element not found");
+            log("setupNoActiveButtonObserver", "Toolbar element not found");
             return;
         }
 
         noActiveButtonObserver = new MutationObserver(() => {
-            // Check if there are no active buttons
-            const hasActiveButton = toolbarElement.querySelector(".button-toolbar.active");
+            const hasActiveButton = toolbarElement.querySelector(SELECTORS.ACTIVE_BUTTON);
 
-            if (!hasActiveButton && currentState === SIDEPANEL_STATES.OVERLAY) {
-                console.log("[setupNoActiveButtonObserver] No active buttons detected while in OVERLAY mode, switching to PINNED");
+            if (!hasActiveButton && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
+                log("setupNoActiveButtonObserver", "No active buttons detected in HOVER/FIXED mode, switching to INACTIVE");
 
-                // Save current state (same pattern as non-Sharp Tabs button click at line 453)
                 if (!previousState) {
                     previousState = currentState;
                 }
-                setState(SIDEPANEL_STATES.PINNED);
+                setState(SIDEPANEL_STATES.INACTIVE);
             }
         });
 
@@ -411,71 +418,61 @@
             attributes: true,
             attributeFilter: ["class"],
         });
-
-        console.log("[setupNoActiveButtonObserver] No active button observer started");
     }
 
-    // === TOOLBAR CLICK LISTENER ===
     function setupToolbarClickListener() {
-        const toolbarElement = document.querySelector("#panels > #switch > div.toolbar");
+        const toolbarElement = document.querySelector(SELECTORS.TOOLBAR);
 
         if (!toolbarElement) {
-            console.log("[setupToolbarClickListener] Toolbar element not found");
+            log("setupToolbarClickListener", "Toolbar element not found");
             return;
         }
 
         toolbarElement.addEventListener("click", (event) => {
-            buttonClicked = true;
-            setTimeout(() => {
-                buttonClicked = false;
-            }, 100);
-
-            // Check if the clicked element is a button or inside a button
             const clickedButton = event.target.closest("button");
 
-            if (clickedButton) {
-                console.log("[Toolbar Click] Button clicked:", {
-                    element: clickedButton,
-                    name: clickedButton.name || "no name",
-                    ariaLabel: clickedButton.getAttribute("aria-label") || "no aria-label",
-                    title: clickedButton.title || "no title",
-                    id: clickedButton.id || "no id",
-                    className: clickedButton.className || "no classes",
-                });
+            if (!clickedButton) return;
 
-                if (isSharpTabsButton(clickedButton)) {
-                    console.log("[Toolbar Click] Sharp Tabs button clicked");
-                    if (getActiveSharpTabsButton()) {
-                        console.log("[Toolbar Click] Sharp Tabs button clicked and active");
-                        setState(previousState || SIDEPANEL_STATES.PINNED);
-                        previousState = null;
-                    } else {
-                        console.log("[Toolbar Click] Sharp Tabs button clicked and inactive");
-                        const currentPanelContainerWidth = getCurrentPanelContainerWidth();
-                        if (currentPanelContainerWidth === "35px") {
-                            // Sharp Tabs Closed so just do pinned and save prev
-                            previousState = currentState;
-                            setState(SIDEPANEL_STATES.PINNED);
-                        } else {
-                            setState(previousState);
-                            previousState = null;
-                        }
-                    }
-                } else {
-                    console.log("[Toolbar Click] Non-Sharp Tabs button clicked");
+            log("toolbarClick", "Button clicked", {
+                aria_label: clickedButton.getAttribute("aria-label"),
+                name: clickedButton.name,
+            });
 
-                    if (!previousState) previousState = currentState;
-                    setState(SIDEPANEL_STATES.PINNED);
-                }
+            if (isSharpTabsButton(clickedButton)) {
+                handleSharpTabsButtonClick(clickedButton);
             } else {
-                console.log("[Toolbar Click] Non-button element clicked:", event.target);
+                handleNonSharpTabsButtonClick();
             }
         });
-
-        console.log("[setupToolbarClickListener] Toolbar click listener attached");
     }
 
-    // === UTILITY METHODS ===
+    function handleSharpTabsButtonClick(button) {
+        log("handleSharpTabsButtonClick", "Sharp Tabs button clicked");
+
+        if (getActiveSharpTabsButton()) {
+            log("handleSharpTabsButtonClick", "Active - restoring previous state");
+            setState(previousState || SIDEPANEL_STATES.INACTIVE);
+            previousState = null;
+        } else {
+            log("handleSharpTabsButtonClick", "Inactive");
+            const currentWidth = getCurrentPanelContainerWidth();
+            if (currentWidth === PANEL_WIDTH.CLOSED) {
+                previousState = currentState;
+                setState(SIDEPANEL_STATES.INACTIVE);
+            } else {
+                setState(previousState);
+                previousState = null;
+            }
+        }
+    }
+
+    function handleNonSharpTabsButtonClick() {
+        log("handleNonSharpTabsButtonClick", "Non-Sharp Tabs button clicked");
+
+        if (!previousState) previousState = currentState;
+        setState(SIDEPANEL_STATES.INACTIVE);
+    }
+
     function getCurrentPanelContainerWidth() {
         const style = panelsContainer.getAttribute("style") || "";
         const match = style.match(/width:\s*(\d+(?:\.\d+)?px)/);
@@ -483,107 +480,61 @@
     }
 
     function isSharpTabsButton(button) {
-        return button.getAttribute("aria-label").startsWith("Sharp Tabs") || button.getAttribute("aria-label").includes("/sb.html");
+        const ariaLabel = button.getAttribute("aria-label");
+        if (!ariaLabel) return false;
+        return ariaLabel.startsWith("Sharp Tabs") || ariaLabel.includes("/sb.html");
     }
 
     function getActiveSharpTabsButton() {
-        return document.querySelector('.button-toolbar.active > button[aria-label^="Sharp Tabs"], .button-toolbar.active > button[aria-label*="/sb.html"]');
+        return document.querySelector(SELECTORS.SHARP_TABS_BUTTON);
     }
 
-    function reactToPanelContainerWidthModification() {
-        if (buttonClicked) {
-            console.log("[reactToPanelContainerWidthModification] Button clicked, skipping width modification");
-            return;
-        }
-
-        // Check if user is manually resizing the panel
-        const isManuallyResizing = panelsContainer.classList.contains("resizing");
-
-        if (isManuallyResizing && currentState === SIDEPANEL_STATES.PINNED) {
-            console.log("[reactToPanelContainerWidthModification] Manual resizing detected in pinned mode, maintaining current state");
-            return;
-        }
-
+    function initializePanel() {
         // Check current width of panels-container to determine initial state
-        const currentPanelContainerWidth = getCurrentPanelContainerWidth();
+        const currentWidth = getCurrentPanelContainerWidth();
 
-        console.log("[reactToPanelContainerWidthModification] Panel container width changed to:", currentPanelContainerWidth);
+        log("initializePanel", "Panel container width:", currentWidth);
 
-        if (currentPanelContainerWidth === "0px") {
-            console.log("[reactToPanelContainerWidthModification] Width is 0px (entering fullscreen), saving state");
-
-            // If previousState exists, it means the observer just saved the state before switching to PINNED
-            // Use that as the state to restore when exiting fullscreen
+        if (currentWidth === PANEL_WIDTH.COLLAPSED) {
+            log("initializePanel", "Width is 0px (entering fullscreen), saving state");
             stateBeforePanelContainerModification = previousState || currentState;
-            console.log("[reactToPanelContainerWidthModification] Saved state:", stateBeforePanelContainerModification);
-
-            setState(SIDEPANEL_STATES.PINNED);
+            setState(SIDEPANEL_STATES.INACTIVE);
         } else if (firstInit) {
             firstInit = false;
-            // Width is not 0px - initialize to overlay state
-            console.log("[reactToPanelContainerWidthModification] Initial width is not 0px, setting to overlay");
-            setState(stateBeforePanelContainerModification || SIDEPANEL_STATES.OVERLAY);
+            log("initializePanel", "Initial width is not 0px, setting to fixed");
+            setState(stateBeforePanelContainerModification || SIDEPANEL_STATES.FIXED);
         } else {
-            console.log("[reactToPanelContainerWidthModification] Width changed (exiting fullscreen), restoring state:", stateBeforePanelContainerModification);
+            log("initializePanel", "Width changed, restoring state:", stateBeforePanelContainerModification);
             setState(stateBeforePanelContainerModification);
-
-            // Clear previousState to avoid conflicts with button click logic
             previousState = null;
         }
     }
 
-    // === CLEANUP ===
     function destroy() {
-        // Clear timeouts
-        clearTimeoutByType("expand");
-        clearTimeoutByType("collapse");
-
-        // Remove event listeners
         removeEventListeners();
 
-        // Disconnect observers
-        if (buttonObserver) {
-            buttonObserver.disconnect();
-        }
         if (toggleObserver) {
             toggleObserver.disconnect();
-        }
-        if (panelObserver) {
-            panelObserver.disconnect();
         }
         if (noActiveButtonObserver) {
             noActiveButtonObserver.disconnect();
         }
 
-        // Remove styles
         removeStyles();
-
-        console.log("[destroy] Sidebar manager destroyed");
+        log("destroy", "Sidebar manager destroyed");
     }
 
-    // === INITIALIZATION AND MANAGEMENT ===
-    let initInterval;
+    log("SCRIPT_START", "Vivaldi Sidebar Manager starting execution");
 
-    function initializeManager() {
-        console.log("[initializeManager] Attempting to initialize manager");
-
+    let initInterval = setInterval(() => {
         if (init()) {
-            console.log("[initializeManager] Manager initialized successfully, clearing init interval");
+            log("initializeManager", "Manager initialized successfully, clearing init interval");
             clearInterval(initInterval);
 
-            // Set up periodic reinitialization check to handle sidepanel
+            // Periodic reinitialization check
             setInterval(() => {
                 init();
-                validateAndFixButton();
             }, 5000);
         }
-    }
-
-    // === SCRIPT ENTRY POINT ===
-    console.log("[SCRIPT START] Vivaldi Sidebar Manager starting execution. Looking for panels-container to initialize styles on it.");
-    initInterval = setInterval(initializeManager, 800);
+    }, 800);
 })();
-
-function dedent(css) {
-    return css.replace(/^ {4}/gm, "");
-}
