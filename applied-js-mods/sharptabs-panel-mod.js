@@ -185,13 +185,11 @@
         } else if (newState === SIDEPANEL_STATES.HOVER) {
             lastActiveMode = SIDEPANEL_STATES.HOVER; // Remember this mode
             setModeClass(SIDEPANEL_STATES.HOVER);
-            addEventListeners();
             addIconToToggleButton(ICONS.HOVER);
             log("setState", "Set state to HOVER");
         } else if (newState === SIDEPANEL_STATES.FIXED) {
             lastActiveMode = SIDEPANEL_STATES.FIXED; // Remember this mode
             setModeClass(SIDEPANEL_STATES.FIXED);
-            addEventListeners();
             addIconToToggleButton(ICONS.FIXED);
             log("setState", "Set state to FIXED");
         }
@@ -223,52 +221,6 @@
         });
 
         log("removeModeClasses", "All mode classes removed");
-    }
-
-    // === EVENT LISTENERS ===
-    function addEventListeners() {
-        log("addEventListeners", "Adding event listeners");
-        panelsContainer.addEventListener("mouseenter", handleMouseEnter);
-        panelsContainer.addEventListener("mouseleave", handleMouseLeave);
-    }
-
-    function removeEventListeners() {
-        log("removeEventListeners", "Removing event listeners");
-        panelsContainer.removeEventListener("mouseenter", handleMouseEnter);
-        panelsContainer.removeEventListener("mouseleave", handleMouseLeave);
-    }
-
-    // === MOUSE EVENTS ===
-    function handleMouseEnter() {
-        log("handleMouseEnter", "Triggered", { currentState, gracePeriod: transitionGracePeriod });
-
-        if (currentState === SIDEPANEL_STATES.INACTIVE) return;
-        if (transitionGracePeriod) {
-            log("handleMouseEnter", "Skipping due to transition grace period");
-            return;
-        }
-
-        if (!getActiveSharpTabsButton()) {
-            log("handleMouseEnter", "No active button found, skipping expansion");
-            return;
-        }
-
-        if (!panelsContainer.classList.contains("panel-expanded")) {
-            panelsContainer.classList.add("panel-expanded");
-        }
-    }
-
-    function handleMouseLeave() {
-        log("handleMouseLeave", "Triggered", { currentState });
-
-        if (currentState === SIDEPANEL_STATES.INACTIVE) return;
-
-        if (transitionGracePeriod) {
-            transitionGracePeriod = false;
-            log("handleMouseLeave", "Transition grace period cleared");
-        }
-
-        panelsContainer.classList.remove("panel-expanded");
     }
 
     // === TOGGLE BUTTON ===
@@ -673,8 +625,6 @@
     }
 
     function destroy() {
-        removeEventListeners();
-
         if (toggleObserver) {
             toggleObserver.disconnect();
         }

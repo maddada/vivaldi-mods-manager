@@ -11,10 +11,31 @@
     transition: flex-basis 0.3s ease-in-out, opacity 0.3s ease-in-out, width 0.3s ease-in-out !important;
 }
 
+#webview-container {
+    transition: padding-left 0.17s ease-in-out !important;
+}
+
+#app #panels-container {
+    will-change: width;
+    height: 100%;
+}
+
 /* === FIXED MODE === */
 /* This mode hides Vivaldi's panel's bar and just keeps the SharpTabs extension shown */
 /* It also sets the side bar to be narrower than the minimum default allowed value of 260px */
 
+#app.sharptabs-fixed-mode {
+    --width-full: 220px;
+    --width-minimized: 77px;
+    --width-hovered: 220px;
+    --animation-speed: 0.2s;
+    --transition-web-panel: transform var(--animation-speed) ease-in-out, width var(--animation-speed) ease-in-out;
+
+    /* IMPORTANT: Incase you face any issues with the panel placement
+    then adjust these values like shown in the video: */
+    --shift-vivaldi-panel-bar-left: 0px;
+    --shift-vivaldi-page: 200px;
+}
 
 #app.sharptabs-fixed-mode #switch {
     width: 0 !important;
@@ -29,8 +50,15 @@
 
 /* Adjust this to set the panel width to less than 260px here, but it'll disable resizing */
 #app.sharptabs-fixed-mode #panels-container {
+    position: absolute !important;
     /* Static panel width, comment if 260px minimum + resizing + hidden vivaldi panels bar is desired */
     width: 200px !important;
+    transform: translateX(calc(100% + var(--shift-vivaldi-panel-bar-left-expanded)));
+    height: 100%;
+}
+
+#app.sharptabs-fixed-mode #webview-container {
+    padding-left: var(--shift-vivaldi-page) !important;
 }
 
 /* Hide the resize handle + comment if 260px minimum + resizing is desired */
@@ -39,14 +67,10 @@
 }
 
 /* === HOVER MODE === */
-
-/* Define CSS variables when hover mode is active */
 #app.sharptabs-hover-mode {
     --width-full: 220px;
     --width-minimized: 77px;
     --width-hovered: 220px;
-    --animation-speed: 0.2s;
-    --transition-web-panel: transform var(--animation-speed) ease-in-out, width var(--animation-speed) ease-in-out;
 
     /* IMPORTANT: Incase you face any issues with the panel placement
     then adjust these values like shown in the video: */
@@ -73,35 +97,16 @@
     transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
 }
 
-/*
-#app.sharptabs-hover-mode #panels-container {
-    width: var(--width-minimized) !important;
-}
-*/
-
 #app.sharptabs-hover-mode #panels-container {
     position: absolute !important;
-    transition: width var(--animation-speed) ease-in-out !important;
     will-change: width;
+    width: var(--width-minimized);
+    transition: transform 0.2s ease-in-out, width 0.2s ease-in-out !important;
 }
 
  #app.sharptabs-hover-mode .panel-collapse-guard {
     min-width: var(--width-minimized) !important;
     max-width: var(--width-hovered) !important;
-}
-
-/*
-#app.sharptabs-hover-mode #panels-container.panel-expanded {
-    max-width: var(--width-minimized) !important;
-    min-width: var(--width-minimized) !important;
-}
-*/
-
-#app.sharptabs-hover-mode div#panels-container {
-    width: var(--width-minimized);
-    transition: var(--transition-web-panel) !important;
-    will-change: width;
-    height: 100%;
 }
 
 #app.sharptabs-hover-mode div#panels-container:hover {
