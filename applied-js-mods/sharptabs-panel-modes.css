@@ -8,11 +8,13 @@
 */
 
 #app #switch {
+    will-change: flex-basis, opacity, width;
     transition: flex-basis 0.3s ease-in-out, opacity 0.3s ease-in-out, width 0.3s ease-in-out !important;
 }
 
 #webview-container {
-    transition: padding-left 0.17s ease-in-out !important;
+    will-change: padding-left;
+    transition: padding-left 0.13s ease-in-out !important;
 }
 
 #app #panels-container {
