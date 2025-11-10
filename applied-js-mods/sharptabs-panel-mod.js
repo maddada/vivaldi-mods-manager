@@ -1,3 +1,5 @@
+// Version v1.1 - 2025-11-11
+
 (function () {
     ("use strict");
 
