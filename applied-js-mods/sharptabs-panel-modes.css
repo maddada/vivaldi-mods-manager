@@ -5,13 +5,14 @@
     ============================================
 */
 
-/* === FIXED MODE === */
-/* This mode hides Vivaldi's bar and just keeps the SharpTabs extension shown */
-/* It also sets the side bar to be narrower than the minimum allowed value of 260px */
-
 #app #switch {
     transition: flex-basis 0.3s ease-in-out, opacity 0.3s ease-in-out, width 0.3s ease-in-out !important;
 }
+
+/* === FIXED MODE === */
+/* This mode hides Vivaldi's panel's bar and just keeps the SharpTabs extension shown */
+/* It also sets the side bar to be narrower than the minimum default allowed value of 260px */
+
 
 #app.sharptabs-fixed-mode #switch {
     width: 0 !important;
@@ -47,7 +48,6 @@
 
     /* IMPORTANT: Incase you face any issues with the panel placement
     then adjust these values like shown in the video: */
-
     --shift-vivaldi-panel-bar-left-collapsed: 0px;
     --shift-vivaldi-panel-bar-left-expanded: 39px;
     --shift-vivaldi-page: 39px;
@@ -66,17 +66,16 @@
     opacity: 0 !important;
 }
 
-#app.sharptabs-hover-mode #panels-container.panel-expanded {
-    width: var(--width-full) !important;
+#app.sharptabs-hover-mode #panels-container {
+    width: var(--width-minimized) !important;
+    transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
 }
 
-#app.sharptabs-hover-mode #webview-container {
-    padding-left: var(--shift-vivaldi-page) !important;
-}
-
-#app.sharptabs-hover-mode #panels-container:not(.panel-expanded) {
+/*
+#app.sharptabs-hover-mode #panels-container {
     width: var(--width-minimized) !important;
 }
+*/
 
 #app.sharptabs-hover-mode #panels-container {
     position: absolute !important;
@@ -84,32 +83,38 @@
     will-change: width;
 }
 
-#app.sharptabs-hover-mode .panel-collapse-guard {
+ #app.sharptabs-hover-mode .panel-collapse-guard {
     min-width: var(--width-minimized) !important;
     max-width: var(--width-hovered) !important;
 }
 
+/*
 #app.sharptabs-hover-mode #panels-container.panel-expanded {
+    max-width: var(--width-minimized) !important;
+    min-width: var(--width-minimized) !important;
+}
+*/
+
+#app.sharptabs-hover-mode div#panels-container {
+    width: var(--width-minimized);
+    transition: var(--transition-web-panel) !important;
+    will-change: width;
+    height: 100%;
+}
+
+#app.sharptabs-hover-mode div#panels-container:hover {
     width: var(--width-hovered) !important;
+    transform: translateX(var(--shift-vivaldi-panel-bar-left-collapsed));
+}
+
+
+/* shift page to the right (confirmed) */
+#app.sharptabs-hover-mode #webview-container {
+    padding-left: var(--shift-vivaldi-page) !important;
 }
 
 /* Make the side panel not resizeable in overlay mode */
 /* Makes cursor not change when hovering side panel */
 #app.sharptabs-hover-mode #panels-container > button.SlideBar--FullHeight {
     display: none;
-}
-
-#app.sharptabs-hover-mode div#panels-container {
-    transition: var(--transition-web-panel) !important;
-    will-change: width;
-    height: 100%;
-}
-
-#app.sharptabs-hover-mode div#panels-container.left {
-    transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
-}
-
-#app.sharptabs-hover-mode #browser:has(div#panels-container.left:hover) div#panels-container.left,
-#app.sharptabs-hover-mode #browser.tabs-left:has(div#panels-container.left):has(:is(.inner .tabbar-wrapper):hover) div#panels-container.left {
-    transform: translateX(var(--shift-vivaldi-panel-bar-left-collapsed));
 }

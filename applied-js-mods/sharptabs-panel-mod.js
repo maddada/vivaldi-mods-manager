@@ -12,7 +12,8 @@
         TOGGLE_BUTTON: ".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button",
         TOOLBAR: "#panels > #switch > div.toolbar",
         ACTIVE_BUTTON: ".button-toolbar.active",
-        SHARP_TABS_BUTTON: '.button-toolbar.active > button[aria-label^="Sharp Tabs"], .button-toolbar.active > button[aria-label*="/sb.html"]',
+        SHARP_TABS_BUTTON: '.button-toolbar > button[aria-label^="Sharp Tabs"], .button-toolbar > button[aria-label*="/sb.html"]',
+        ACTIVE_SHARP_TABS_BUTTON: '.button-toolbar.active > button[aria-label^="Sharp Tabs"], .button-toolbar.active > button[aria-label*="/sb.html"]',
     };
 
     const ICONS = {
@@ -45,7 +46,7 @@
 
     // Observers
     let toggleObserver = null;
-    let noActiveButtonObserver = null;
+    let toolbarStateObserver = null;
 
     // CSS Classes for modes
     const MODE_CLASSES = {
@@ -65,7 +66,7 @@
             panelsContainer: !!panelsContainer,
             toggleButton: !!toggleButton,
             appElement: !!appElement,
-            toggleButtonSelector: SELECTORS.TOGGLE_BUTTON
+            toggleButtonSelector: SELECTORS.TOGGLE_BUTTON,
         });
 
         if (!panelsContainer || !appElement) {
@@ -75,9 +76,16 @@
         const alreadyInit = isAlreadyInitialized();
 
         if (alreadyInit) {
-            log("init", "Already loaded, but checking toggle button");
+            log("init", "Already loaded, but checking toggle button and observer");
             // Even if already initialized, ensure toggle button listener is attached
             setupToggleButton();
+
+            // Also ensure the toolbar state observer is still active
+            if (!toolbarStateObserver) {
+                log("init", "Observer not found, re-initializing");
+                setupToolbarStateObserver();
+            }
+
             return true;
         }
 
@@ -85,7 +93,7 @@
         initializePanel();
         markAsInitialized();
         setupToggleButton();
-        setupNoActiveButtonObserver();
+        setupToolbarStateObserver();
         setupToolbarClickListener();
 
         return true;
@@ -208,7 +216,7 @@
     function removeModeClasses() {
         if (!appElement) return;
 
-        Object.values(MODE_CLASSES).forEach(className => {
+        Object.values(MODE_CLASSES).forEach((className) => {
             appElement.classList.remove(className);
         });
 
@@ -304,7 +312,7 @@
             tagName: toggleButton.tagName,
             className: toggleButton.className,
             disabled: toggleButton.disabled,
-            style: toggleButton.getAttribute("style")
+            style: toggleButton.getAttribute("style"),
         });
 
         const handleClick = (e) => {
@@ -313,8 +321,14 @@
                 button: e.button,
                 currentState,
                 target: e.target.tagName,
-                currentTarget: e.currentTarget.tagName
+                currentTarget: e.currentTarget.tagName,
             });
+
+            // Don't react to clicks if Sharp Tabs isn't active
+            if (!getActiveSharpTabsButton()) {
+                log("toggleButton", "Sharp Tabs not active - ignoring click");
+                return;
+            }
 
             e.preventDefault();
             e.stopPropagation();
@@ -338,12 +352,6 @@
                     log("toggleButton", "Middle clicked - switching to INACTIVE");
                 }
 
-                // Only allow transitioning to FIXED or HOVER if Sharp Tabs is active
-                if ((nextState === SIDEPANEL_STATES.HOVER || nextState === SIDEPANEL_STATES.FIXED) && !getActiveSharpTabsButton()) {
-                    log("toggleButton", "Cannot transition to HOVER/FIXED - no active Sharp Tabs button");
-                    return;
-                }
-
                 setState(nextState);
                 return;
             }
@@ -364,12 +372,6 @@
                     nextState = SIDEPANEL_STATES.FIXED;
                 }
 
-                // Only allow transitioning to FIXED or HOVER if Sharp Tabs is active
-                if ((nextState === SIDEPANEL_STATES.HOVER || nextState === SIDEPANEL_STATES.FIXED) && !getActiveSharpTabsButton()) {
-                    log("toggleButton", "Cannot transition to HOVER/FIXED - no active Sharp Tabs button");
-                    return;
-                }
-
                 setState(nextState);
             }
         };
@@ -386,20 +388,24 @@
         setTimeout(() => {
             log("attachToggleListeners", "Testing button responsiveness", {
                 hasListeners: toggleButton.hasAttribute("data-listener-attached"),
-                buttonElement: toggleButton
+                buttonElement: toggleButton,
             });
         }, 1000);
 
         // Add a global listener to detect if clicks are happening at all
-        document.addEventListener("mousedown", (e) => {
-            if (e.target === toggleButton || toggleButton.contains(e.target)) {
-                log("GLOBAL LISTENER", "Click detected on toggle button area", {
-                    target: e.target.tagName,
-                    button: e.button,
-                    toggleButtonMatches: e.target === toggleButton
-                });
-            }
-        }, true);
+        document.addEventListener(
+            "mousedown",
+            (e) => {
+                if (e.target === toggleButton || toggleButton.contains(e.target)) {
+                    log("GLOBAL LISTENER", "Click detected on toggle button area", {
+                        target: e.target.tagName,
+                        button: e.button,
+                        toggleButtonMatches: e.target === toggleButton,
+                    });
+                }
+            },
+            true
+        );
     }
 
     function addIconToToggleButton(iconType) {
@@ -407,7 +413,6 @@
         if (!toggleButton) return;
 
         toggleButton.disabled = false;
-        toggleButton.style = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
 
         let svgHTML;
         switch (iconType) {
@@ -448,35 +453,130 @@
             log("addIconToToggleButton", "Listeners not attached, attaching now");
             attachToggleListeners();
         }
+
+        // Update the button's interactivity state
+        updateToggleButtonInteractivity();
     }
 
-    function setupNoActiveButtonObserver() {
+    function updateToggleButtonInteractivity() {
+        if (!toggleButton) return;
+
+        const isSharpTabsActive = !!getActiveSharpTabsButton();
+        const isInactiveMode = currentState === SIDEPANEL_STATES.INACTIVE;
+
+        log("updateToggleButtonInteractivity", "Updating button state", { isSharpTabsActive, currentState });
+
+        // Only show disabled state when in INACTIVE mode AND Sharp Tabs is not active
+        if (isInactiveMode && !isSharpTabsActive) {
+            // Button should appear disabled
+            toggleButton.style.cssText = "-webkit-app-region: no-drag !important; cursor: not-allowed !important; pointer-events: auto !important; opacity: 0.5 !important;";
+            toggleButton.setAttribute("title", "Activate the Sharp Tabs sidebar first");
+        } else {
+            // Button should be interactive (either Sharp Tabs is active, or we're in HOVER/FIXED mode)
+            toggleButton.style.cssText = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
+            toggleButton.removeAttribute("title");
+        }
+    }
+
+    function setupToolbarStateObserver() {
+        // Disconnect existing observer if it exists
+        if (toolbarStateObserver) {
+            log("setupToolbarStateObserver", "Disconnecting existing observer");
+            toolbarStateObserver.disconnect();
+            toolbarStateObserver = null;
+        }
+
+        // Find the toolbar element
         const toolbarElement = document.querySelector(SELECTORS.TOOLBAR);
 
         if (!toolbarElement) {
-            log("setupNoActiveButtonObserver", "Toolbar element not found");
+            log("setupToolbarStateObserver", "Toolbar element not found, will retry");
+            setTimeout(() => {
+                setupToolbarStateObserver();
+            }, 1000);
             return;
         }
 
-        noActiveButtonObserver = new MutationObserver(() => {
-            const hasActiveButton = toolbarElement.querySelector(SELECTORS.ACTIVE_BUTTON);
+        log("setupToolbarStateObserver", "Setting up unified toolbar state observer");
 
-            if (!hasActiveButton && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
-                log("setupNoActiveButtonObserver", "No active buttons detected in HOVER/FIXED mode, switching to INACTIVE");
+        toolbarStateObserver = new MutationObserver((mutations) => {
+            // Track if we handled a Sharp Tabs specific state change
+            let handledSharpTabsChange = false;
 
-                if (!previousState) {
-                    previousState = currentState;
+            // First pass: Check for Sharp Tabs specific state changes
+            mutations.forEach((mutation) => {
+                if (mutation.type === "attributes" && mutation.attributeName === "class") {
+                    const target = mutation.target;
+
+                    // Check if this is a button-toolbar element
+                    if (!target.classList.contains("button-toolbar")) {
+                        return;
+                    }
+
+                    // Check if it contains a Sharp Tabs button
+                    const button = target.querySelector("button");
+                    const ariaLabel = button?.getAttribute("aria-label");
+                    const isSharpTabs = ariaLabel && (ariaLabel.startsWith("Sharp Tabs") || ariaLabel.includes("/sb.html"));
+
+                    if (!isSharpTabs) {
+                        return;
+                    }
+
+                    const isActive = target.classList.contains("active");
+                    const oldValue = mutation.oldValue || "";
+                    const wasActive = oldValue.includes("active");
+
+                    // Only process if active state actually changed
+                    if (isActive === wasActive) {
+                        return;
+                    }
+
+                    log("setupToolbarStateObserver", `Sharp Tabs panel ${isActive ? "activated" : "deactivated"}`);
+
+                    handledSharpTabsChange = true;
+
+                    // Update toggle button interactivity based on Sharp Tabs state
+                    updateToggleButtonInteractivity();
+
+                    // If panel became inactive (lost active class)
+                    if (!isActive && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
+                        log("setupToolbarStateObserver", "Sharp Tabs deactivated - switching to INACTIVE mode");
+                        setState(SIDEPANEL_STATES.INACTIVE);
+                    }
+                    // If panel became active again (gained active class)
+                    else if (isActive && currentState === SIDEPANEL_STATES.INACTIVE) {
+                        log("setupToolbarStateObserver", "Sharp Tabs activated - restoring mode:", lastActiveMode);
+                        setState(lastActiveMode);
+                    }
                 }
-                setState(SIDEPANEL_STATES.INACTIVE);
+            });
+
+            // Second pass: If no Sharp Tabs change, check for general "no active buttons" condition
+            if (!handledSharpTabsChange) {
+                const hasActiveButton = toolbarElement.querySelector(SELECTORS.ACTIVE_BUTTON);
+
+                if (!hasActiveButton && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
+                    log("setupToolbarStateObserver", "No active buttons detected in HOVER/FIXED mode, switching to INACTIVE");
+
+                    if (!previousState) {
+                        previousState = currentState;
+                    }
+                    setState(SIDEPANEL_STATES.INACTIVE);
+                    updateToggleButtonInteractivity();
+                }
             }
         });
 
-        noActiveButtonObserver.observe(toolbarElement, {
+        // Observe the toolbar element with subtree to catch all descendant changes
+        toolbarStateObserver.observe(toolbarElement, {
             childList: true,
             subtree: true,
             attributes: true,
             attributeFilter: ["class"],
+            attributeOldValue: true,
         });
+
+        log("setupToolbarStateObserver", "Observer initialized successfully");
     }
 
     function setupToolbarClickListener() {
@@ -530,6 +630,7 @@
 
         if (!previousState) previousState = currentState;
         setState(SIDEPANEL_STATES.INACTIVE);
+        updateToggleButtonInteractivity();
     }
 
     function getCurrentPanelContainerWidth() {
@@ -545,7 +646,7 @@
     }
 
     function getActiveSharpTabsButton() {
-        return document.querySelector(SELECTORS.SHARP_TABS_BUTTON);
+        return document.querySelector(SELECTORS.ACTIVE_SHARP_TABS_BUTTON);
     }
 
     function initializePanel() {
@@ -575,19 +676,19 @@
         if (toggleObserver) {
             toggleObserver.disconnect();
         }
-        if (noActiveButtonObserver) {
-            noActiveButtonObserver.disconnect();
-        }
+        // DO NOT disconnect toolbarStateObserver - we need it to stay active
+        // so it can detect when the Sharp Tabs panel becomes active/inactive
+        // and handle the "no active buttons" condition
 
         removeModeClasses();
-        log("destroy", "Sidebar manager destroyed");
+        log("destroy", "Sidebar manager destroyed (toolbarStateObserver kept active)");
     }
 
     log("SCRIPT_START", "Vivaldi Sidebar Manager starting execution");
 
     let initInterval = setInterval(() => {
         if (init()) {
-            log("initializeManager", "Manager initialized successfully, clearing init interval");
+            log("init", "Manager initialized successfully");
             clearInterval(initInterval);
 
             // Periodic reinitialization check
