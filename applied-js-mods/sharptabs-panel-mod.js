@@ -267,6 +267,16 @@
             toggleButton.removeEventListener("mousedown", currentClickHandler, true);
         }
 
+        // CRITICAL: Remove disabled attribute if we're in an active mode
+        if (currentState !== SIDEPANEL_STATES.INACTIVE) {
+            const wasDisabled = toggleButton.hasAttribute("disabled");
+            toggleButton.removeAttribute("disabled");
+            toggleButton.disabled = false;
+            if (wasDisabled) {
+                console.log(`[attachToggleListeners] Removed disabled attribute (was blocking clicks!)`);
+            }
+        }
+
         // Generate a unique ID for this button element instance
         const newButtonId = `btn_${Date.now()}_${Math.random()}`;
 
