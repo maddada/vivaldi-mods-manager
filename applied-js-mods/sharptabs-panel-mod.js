@@ -38,7 +38,6 @@
     let currentState = SIDEPANEL_STATES.FIXED;
     let previousState = null;
     let lastActiveMode = SIDEPANEL_STATES.FIXED; // Track last non-inactive mode (Fixed or Hover)
-    let transitionGracePeriod = false;
     let stateBeforePanelContainerModification = null;
     let firstInit = true;
 
@@ -167,15 +166,6 @@
 
     // === STATE MANAGEMENT ===
     function setState(newState) {
-        const wasInactive = currentState === SIDEPANEL_STATES.INACTIVE;
-        const becomingHover = newState === SIDEPANEL_STATES.HOVER;
-        const becomingFixed = newState === SIDEPANEL_STATES.FIXED;
-
-        if (wasInactive && (becomingHover || becomingFixed)) {
-            transitionGracePeriod = true;
-            log("setState", "Enabling transition grace period");
-        }
-
         currentState = newState;
 
         if (newState === SIDEPANEL_STATES.INACTIVE) {
@@ -648,9 +638,6 @@
         if (toggleObserver) {
             toggleObserver.disconnect();
         }
-        // DO NOT disconnect toolbarStateObserver - we need it to stay active
-        // so it can detect when the Sharp Tabs panel becomes active/inactive
-        // and handle the "no active buttons" condition
 
         removeModeClasses();
         log("destroy", "Sidebar manager destroyed (toolbarStateObserver kept active)");
