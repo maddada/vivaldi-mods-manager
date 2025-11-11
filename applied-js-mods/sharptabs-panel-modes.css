@@ -87,12 +87,22 @@
     --shift-vivaldi-page: 38px !important;
 }
 
-/* When the panel collapse styles are active, hide the panel's buttons */
+/* When the panel hover mode is active, hide the panel's buttons */
 #app.sharptabs-hover-mode #switch {
     width: 0 !important;
     flex-basis: 0 !important;
     opacity: 0 !important;
 }
+
+/* Uncomment the following code if you want to keep the panel buttons when you hover over the collapsed sidebar: */
+/*
+#app.sharptabs-hover-mode:not(:hover) #switch {
+    width: 0 !important;
+    flex-basis: 0 !important;
+    opacity: 0 !important;
+}
+*/
+
 
 #app.sharptabs-hover-mode #panels-container {
     width: var(--width-minimized) !important;

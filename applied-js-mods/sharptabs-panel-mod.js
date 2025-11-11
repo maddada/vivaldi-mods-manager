@@ -11,7 +11,8 @@
 
     const SELECTORS = {
         PANELS_CONTAINER: "#panels-container",
-        TOGGLE_BUTTON: ".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button",
+        // TOGGLE_BUTTON: ".mainbar .button-toolbar.toolbar-spacer-panel button, .mainbar .button-toolbar.toolbar-spacer button",
+        TOGGLE_BUTTON: ".mainbar .toolbar-mainbar.toolbar-visible .button-toolbar.toolbar-spacer-panel button, .mainbar .toolbar-mainbar.toolbar-visible .button-toolbar.toolbar-spacer button",
         TOOLBAR: "#panels > #switch > div.toolbar",
         ACTIVE_BUTTON: ".button-toolbar.active",
         SHARP_TABS_BUTTON: '.button-toolbar > button[aria-label^="Sharp Tabs"], .button-toolbar > button[aria-label*="/sb.html"]',
@@ -30,7 +31,7 @@
     };
 
     const log = (context, message, ...args) => {
-        console.log(`[${context}] ${message}`, ...args);
+        // console.log(`[${context}] ${message}`, ...args);
     };
 
     // === STATE VARIABLES ===
@@ -44,6 +45,7 @@
     // DOM elements
     let panelsContainer = null;
     let toggleButton = null;
+    let toggleButtonId = null; // Track unique identifier for the button element
     let appElement = null;
 
     // Observers
@@ -226,6 +228,7 @@
     // === TOGGLE BUTTON ===
     function setupToggleButton() {
         log("setupToggleButton", "Called", { buttonExists: !!toggleButton });
+
         if (toggleButton) {
             log("setupToggleButton", "Button found, attaching listeners");
             attachToggleListeners();
@@ -256,8 +259,14 @@
     }
 
     function attachToggleListeners() {
-        // Only attach if not already attached
-        if (toggleButton.hasAttribute("data-listener-attached")) {
+        // Generate a unique ID for this button element instance
+        const newButtonId = `btn_${Date.now()}_${Math.random()}`;
+
+        // Check if this is the same button element we had before
+        const buttonHasOurId = toggleButton.hasAttribute("data-button-id");
+        const existingId = toggleButton.getAttribute("data-button-id");
+
+        if (buttonHasOurId && existingId === toggleButtonId) {
             log("attachToggleListeners", "Listener already attached, skipping");
             return;
         }
@@ -335,7 +344,11 @@
         toggleButton.addEventListener("auxclick", handleClick, true);
         toggleButton.addEventListener("mousedown", handleClick, true);
 
+        // Set both attributes and update our tracking ID
         toggleButton.setAttribute("data-listener-attached", "true");
+        toggleButton.setAttribute("data-button-id", newButtonId);
+        toggleButtonId = newButtonId; // Store the ID for this button instance
+
         log("attachToggleListeners", "Listeners attached successfully");
 
         // Test if events work at all
@@ -362,8 +375,10 @@
         );
     }
 
+
     function addIconToToggleButton(iconType) {
         log("addIconToToggleButton", "Called", { iconType, buttonExists: !!toggleButton });
+
         if (!toggleButton) return;
 
         toggleButton.disabled = false;
@@ -401,10 +416,18 @@
         toggleButton.appendChild(buttonIconSpan);
         toggleButton.setAttribute("data-mod-applied", "true");
 
+        // Check if attributes survived the innerHTML modification
+        const hasListenerAfter = toggleButton.hasAttribute("data-listener-attached");
+        const hasButtonIdAfter = toggleButton.hasAttribute("data-button-id");
+
         // Ensure listeners are still attached after modifying the button
-        // Remove the listener-attached flag so it can be re-attached if needed
-        if (!toggleButton.hasAttribute("data-listener-attached")) {
+        if (!hasListenerAfter || !hasButtonIdAfter || toggleButton.getAttribute("data-button-id") !== toggleButtonId) {
             log("addIconToToggleButton", "Listeners not attached, attaching now");
+
+            // Remove the attributes first to force re-attachment
+            toggleButton.removeAttribute("data-listener-attached");
+            toggleButton.removeAttribute("data-button-id");
+
             attachToggleListeners();
         }
 
@@ -643,8 +666,30 @@
             log("init", "Manager initialized successfully");
             clearInterval(initInterval);
 
-            // Periodic reinitialization check
+            // Periodic reinitialization check with listener monitoring
             setInterval(() => {
+                // Monitor listener state before re-init
+                if (toggleButton) {
+                    const hasListener = toggleButton.hasAttribute("data-listener-attached");
+                    const buttonId = toggleButton.getAttribute("data-button-id");
+                    const buttonIdMatches = buttonId === toggleButtonId;
+
+                    // Check if button element was replaced (has listener attribute but wrong/missing button ID)
+                    if (hasListener && !buttonIdMatches) {
+                        // Button was replaced - re-attach listeners to the new button
+                        toggleButton.removeAttribute("data-listener-attached");
+                        if (buttonId) {
+                            toggleButton.removeAttribute("data-button-id");
+                        }
+                        attachToggleListeners();
+                    }
+
+                    // Check if listener is missing when it should be there
+                    if (!hasListener && currentState !== SIDEPANEL_STATES.INACTIVE) {
+                        attachToggleListeners();
+                    }
+                }
+
                 init();
             }, 5000);
         }
