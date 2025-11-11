@@ -51,6 +51,9 @@
     let toggleObserver = null;
     let toolbarStateObserver = null;
 
+    // Store the current click handler reference for cleanup
+    let currentClickHandler = null;
+
     // CSS Classes for modes
     const MODE_CLASSES = {
         [SIDEPANEL_STATES.FIXED]: "sharptabs-fixed-mode",
@@ -249,6 +252,21 @@
     }
 
     function attachToggleListeners() {
+        console.log(`[attachToggleListeners] Called, button exists: ${!!toggleButton}`);
+
+        if (!toggleButton) {
+            console.log(`[attachToggleListeners] ERROR: No toggleButton found!`);
+            return;
+        }
+
+        // Remove old listeners if they exist
+        if (currentClickHandler) {
+            console.log(`[attachToggleListeners] Removing old listeners`);
+            toggleButton.removeEventListener("click", currentClickHandler, true);
+            toggleButton.removeEventListener("auxclick", currentClickHandler, true);
+            toggleButton.removeEventListener("mousedown", currentClickHandler, true);
+        }
+
         // Generate a unique ID for this button element instance
         const newButtonId = `btn_${Date.now()}_${Math.random()}`;
 
@@ -326,6 +344,9 @@
             }
         };
 
+        // Store the handler reference for future cleanup
+        currentClickHandler = handleClick;
+
         // Try multiple event types to ensure we catch the click
         toggleButton.addEventListener("click", handleClick, true);
         toggleButton.addEventListener("auxclick", handleClick, true);
@@ -336,6 +357,7 @@
         toggleButton.setAttribute("data-button-id", newButtonId);
         toggleButtonId = newButtonId; // Store the ID for this button instance
 
+        console.log(`[attachToggleListeners] Listeners attached successfully`);
         log("attachToggleListeners", "Listeners attached successfully");
 
         // Test if events work at all
@@ -652,8 +674,10 @@
 
             // Periodic reinitialization check with listener monitoring
             setInterval(() => {
+                console.log(`[7s-interval] Running, state=${currentState}, button=${!!toggleButton}`);
                 // Monitor listener state before re-init
                 if (toggleButton && currentState !== SIDEPANEL_STATES.INACTIVE) {
+                    console.log(`[7s-interval] Re-attaching listeners`);
                     // Always re-attach listeners if we're in an active state
                     toggleButton.removeAttribute("data-listener-attached");
                     toggleButton.removeAttribute("data-button-id");
