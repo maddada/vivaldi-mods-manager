@@ -262,15 +262,6 @@
         // Generate a unique ID for this button element instance
         const newButtonId = `btn_${Date.now()}_${Math.random()}`;
 
-        // Check if this is the same button element we had before
-        const buttonHasOurId = toggleButton.hasAttribute("data-button-id");
-        const existingId = toggleButton.getAttribute("data-button-id");
-
-        if (buttonHasOurId && existingId === toggleButtonId) {
-            log("attachToggleListeners", "Listener already attached, skipping");
-            return;
-        }
-
         log("attachToggleListeners", "Attaching listeners to button", {
             tagName: toggleButton.tagName,
             className: toggleButton.className,
@@ -279,6 +270,8 @@
         });
 
         const handleClick = (e) => {
+            console.log(`[handleClick] type=${e.type} button=${e.button} state=${currentState}`);
+
             log("toggleButton", "Event triggered", {
                 type: e.type,
                 button: e.button,
@@ -288,7 +281,9 @@
             });
 
             // Don't react to clicks if Sharp Tabs isn't active
-            if (!getActiveSharpTabsButton()) {
+            const isSharpTabsActive = getActiveSharpTabsButton();
+            if (!isSharpTabsActive) {
+                console.log(`[handleClick] Sharp Tabs NOT active - ignoring`);
                 log("toggleButton", "Sharp Tabs not active - ignoring click");
                 return;
             }
@@ -321,6 +316,7 @@
 
             // For click event (left click only)
             if (e.type === "click" || (e.type === "mousedown" && e.button === 0)) {
+                console.log(`[LEFT-CLICK] Processing from ${currentState}`);
                 log("toggleButton", "Left clicked");
 
                 let nextState;
@@ -335,6 +331,7 @@
                     nextState = SIDEPANEL_STATES.FIXED;
                 }
 
+                console.log(`[LEFT-CLICK] Changing ${currentState} → ${nextState}`);
                 setState(nextState);
             }
         };
@@ -364,6 +361,7 @@
             "mousedown",
             (e) => {
                 if (e.target === toggleButton || toggleButton.contains(e.target)) {
+                    console.log(`[GLOBAL] mousedown detected button=${e.button} state=${currentState}`);
                     log("GLOBAL LISTENER", "Click detected on toggle button area", {
                         target: e.target.tagName,
                         button: e.button,
@@ -374,7 +372,6 @@
             true
         );
     }
-
 
     function addIconToToggleButton(iconType) {
         log("addIconToToggleButton", "Called", { iconType, buttonExists: !!toggleButton });
@@ -669,29 +666,15 @@
             // Periodic reinitialization check with listener monitoring
             setInterval(() => {
                 // Monitor listener state before re-init
-                if (toggleButton) {
-                    const hasListener = toggleButton.hasAttribute("data-listener-attached");
-                    const buttonId = toggleButton.getAttribute("data-button-id");
-                    const buttonIdMatches = buttonId === toggleButtonId;
-
-                    // Check if button element was replaced (has listener attribute but wrong/missing button ID)
-                    if (hasListener && !buttonIdMatches) {
-                        // Button was replaced - re-attach listeners to the new button
-                        toggleButton.removeAttribute("data-listener-attached");
-                        if (buttonId) {
-                            toggleButton.removeAttribute("data-button-id");
-                        }
-                        attachToggleListeners();
-                    }
-
-                    // Check if listener is missing when it should be there
-                    if (!hasListener && currentState !== SIDEPANEL_STATES.INACTIVE) {
-                        attachToggleListeners();
-                    }
+                if (toggleButton && currentState !== SIDEPANEL_STATES.INACTIVE) {
+                    // Always re-attach listeners if we're in an active state
+                    toggleButton.removeAttribute("data-listener-attached");
+                    toggleButton.removeAttribute("data-button-id");
+                    attachToggleListeners();
                 }
 
                 init();
-            }, 5000);
+            }, 7000);
         }
     }, 800);
 })();
