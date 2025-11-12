@@ -8,52 +8,43 @@ A simple, cross-platform tool for installing and managing Vivaldi browser modifi
 
 ## 🚀 Quick Start
 
+### CSS Mods (Optional)
+
+1. Go to `vivaldi://experiments` and enable `Allow CSS modification` flag
+2. Put all the CSS files you want to apply in the `applied-css-mods` folder (only `improved-extensions-dropdown-menu.css` is included by default in this repo)
+3. In Vivaldi settings search for `Custom UI Modifications`, and select the folder called `applied-css-mods`
+4. Restart the browser
+
 ### JavaScript Mods
 
-1. **Edit the appropriate script for your OS:**
+1. **If installing on windows then edit the script for your OS:**
+    - `window_apply_mods.bat`
 
-    - `mac_apply_mods.sh` for macOS
-    - `linux_apply_mods.sh` for Linux
-    - `window_apply_mods.bat` for Windows
+2. **Run the appropriate script for your OS:**
 
-2. **Run the script:**
-
-    ```bash
-    # macOS
-    sudo ./mac_apply_mods.sh
-
-    # Linux
-    sudo ./linux_apply_mods.sh
-
-    # Windows
-    ./window_apply_mods.bat
+    #### macOS
+    ```
+        sudo ./mac_apply_mods.sh
     ```
 
-### CSS Mods
+    #### Linux
+    `sudo ./linux_apply_mods.sh`
 
-1. **Enable CSS modifications:**
+    #### Windows
+    `./window_apply_mods.bat`
 
-    - Open `vivaldi://experiments` or `chrome://flags/#vivaldi-css-mods` for v7.6+
-    - Enable "Allow for using CSS modifications"
 
-2. **Set custom folder:**
-
-    - Go to Settings → Appearance → Custom UI Modifications
-    - Choose your CSS folder (e.g., `applied-css-mods/`)
-
-3. **Add CSS files and restart Vivaldi**
-
-> ⚠️ **Important**: CSS files cannot have spaces in filenames. Ensure files have `.css` extension.
+> ⚠️ **Important**: files cannot have spaces in filenames.
 
 ## 🔄 Auto-Apply Mods (Survives Updates)
 
 ### Windows
 
-Follow the [AutoHotkey v2 guide](windows_auto_apply_instructions.md) to automatically apply mods when Vivaldi updates.
+Follow this [AutoHotkey v2 guide](windows_auto_apply_instructions.md) to automatically apply mods when Vivaldi updates.
 
 ### macOS
 
-I'm using BetterTouchTool to monitor the following folders and run the mac_apply_mods.sh script when changes are detected:
+I'm using BetterTouchTool to monitor the following folders and run the mac_install_mods.sh script when changes are detected, but I'm sure there are other ways:
 
 -   The `applied-js-mods/` folder
 -   Vivaldi installation paths:
@@ -80,6 +71,8 @@ Special thanks to the Vivaldi modding community:
 -   **Isildur** - Mac apply mods script
 -   **debiedowner** - Windows apply mods script
 -   **GwenDragon** - Linux apply mods script
+-   **Igor-Ratajczak** - VivaZen CSS mod
+
 
 And huge thanks to **Vivaldi** for creating the most customizable browser and supporting the modding community!
 

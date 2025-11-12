@@ -103,7 +103,6 @@
 }
 */
 
-
 #app.sharptabs-hover-mode #panels-container {
     width: var(--width-minimized) !important;
     transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
