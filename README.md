@@ -1,4 +1,4 @@
-# 🎨 Vivaldi Mods Manager v1.1
+# 🎨 Sharp Tabs Sidebar Hover to Expand Mod v1.1
 
 Explanation of how to install the mods: https://youtu.be/rZyOo-zy4n4
 
