@@ -1,4 +1,5 @@
-// Version v1.1 - 2025-11-11
+/* Version v1.2 - 2025-11-23 */
+/* 1.2: Fixed full screen youtube videos having a line on the left side of the video */
 
 (function () {
     ("use strict");
