@@ -9,6 +9,14 @@ A simple, cross-platform tool for installing and managing Vivaldi browser modifi
 
 > **Get more mods**: [Vivaldi Forums - Modifications](https://forum.vivaldi.net/category/52/modifications)
 
+## 🚨 Important steps to trouble shoot why it's not working
+
+- Make 100% sure that floating mode is disable for Sharp Tabs (explained in the [install video](https://youtu.be/dOAQyuEaJIQ))
+
+- To re-add Sharp Tabs panel if it was removed do the steps in this video: https://youtu.be/6sVhFGgXQKE
+
+- Make sure to reinstall the latest version of the extension in case of any issues. Post on https://reddit.com/r/sharptabs if the issue keeps happening.
+
 ## 🚀 Quick Start
 
 ### CSS Mods (Optional)
