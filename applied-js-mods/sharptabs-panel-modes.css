@@ -8,7 +8,7 @@
     ============================================
 */
 
-#app #browser.normal #switch {
+#app #browser:is(.normal, .maximized) #switch {
     will-change: flex-basis, opacity, width;
     transition: flex-basis 0.3s ease-in-out, opacity 0.3s ease-in-out, width 0.3s ease-in-out !important;
 }
@@ -18,7 +18,7 @@
     transition: padding-left 0.13s ease-in-out !important;
 }
 
-#app #browser.normal #panels-container {
+#app #browser:is(.normal, .maximized) #panels-container {
     will-change: width;
     height: 100%;
 }
@@ -40,19 +40,19 @@
     --shift-vivaldi-page: 200px;
 }
 
-#app.sharptabs-fixed-mode #browser.normal #switch {
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #switch {
     width: 0 !important;
     flex-basis: 0 !important;
     opacity: 0 !important;
 }
 
-#app.sharptabs-fixed-mode #browser.normal #main.left .panel-group .panel-collapse-guard {
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #main.left .panel-group .panel-collapse-guard {
     min-width: 100% !important;
     max-width: 100% !important;
 }
 
 /* Adjust this to set the panel width when in "fixed mode" (square icon shown) */
-#app.sharptabs-fixed-mode #browser.normal #panels-container {
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #panels-container {
     position: absolute !important;
     /* Static panel width, comment if 260px minimum + resizing + hidden vivaldi panels bar is desired */
     width: 200px !important;
@@ -60,12 +60,12 @@
     height: 100%;
 }
 
-#app.sharptabs-fixed-mode #browser.normal #webview-container {
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #webview-container {
     padding-left: var(--shift-vivaldi-page) !important;
 }
 
 /* Hide the resize handle + comment if 260px minimum + resizing is desired */
-#app.sharptabs-fixed-mode #browser.normal #panels-container > button.SlideBar--FullHeight {
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #panels-container > button.SlideBar--FullHeight {
     display: none;
 }
 
@@ -85,14 +85,14 @@
     --shift-vivaldi-page: 39px;
 }
 
-#app.sharptabs-hover-mode #browser.normal.density-on {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized).density-on {
     --shift-vivaldi-panel-bar-left-collapsed: 0px !important;
     --shift-vivaldi-panel-bar-left-expanded: 38px !important;
     --shift-vivaldi-page: 38px !important;
 }
 
 /* When the panel hover mode is active, hide the panel's buttons */
-#app.sharptabs-hover-mode #browser.normal #switch {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #switch {
     width: 0 !important;
     flex-basis: 0 !important;
     opacity: 0 !important;
@@ -107,35 +107,31 @@
     }
 */
 
-#app.sharptabs-hover-mode #browser.normal #panels-container {
-    width: var(--width-minimized) !important;
-    transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
-}
-
-#app.sharptabs-hover-mode #browser.normal #panels-container {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container {
     position: absolute !important;
     will-change: width;
-    width: var(--width-minimized);
+    width: var(--width-minimized) !important;
+    transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
     transition: transform 0.2s ease-in-out, width 0.2s ease-in-out !important;
 }
 
-#app.sharptabs-hover-mode #browser.normal .panel-collapse-guard {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) .panel-collapse-guard {
     min-width: var(--width-minimized) !important;
     max-width: var(--width-hovered) !important;
 }
 
-#app.sharptabs-hover-mode #browser.normal #panels-container:hover {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container:hover {
     width: var(--width-hovered) !important;
     transform: translateX(var(--shift-vivaldi-panel-bar-left-collapsed));
 }
 
 /* shift page to the right (confirmed) */
-#app.sharptabs-hover-mode #browser.normal #webview-container {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #webview-container {
     padding-left: var(--shift-vivaldi-page) !important;
 }
 
 /* Make the side panel not resizeable in overlay mode */
 /* Makes cursor not change when hovering side panel */
-#app.sharptabs-hover-mode #browser.normal #panels-container > button.SlideBar--FullHeight {
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container > button.SlideBar--FullHeight {
     display: none;
 }
