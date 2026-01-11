@@ -1,5 +1,7 @@
 # 🎨 Sharp Tabs Sidebar Hover to Expand Mod v1.2
 
+https://github.com/user-attachments/assets/a0051a36-b2c5-4266-b431-ac6871783a02
+
 Changelog:
 - v1.2 - 2025-11-23: Fixed full screen youtube videos having a line on the left side of the video
 
