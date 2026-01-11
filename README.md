@@ -62,9 +62,9 @@ I'm using BetterTouchTool to monitor the following folders and run the mac_insta
 -   The `applied-js-mods/` folder
 -   Vivaldi installation paths:
     ```
-    /Applications/Vivaldi.app/Contents/Frameworks/Vivaldi Framework.framework/Versions/Current/Vivaldi Framework
-    /Applications/Vivaldi Snapshot.app/Contents/Frameworks/Vivaldi Framework.framework/Versions/Current/Vivaldi Framework
+    /Applications/Vivaldi.app;;/Applications/Vivaldi Snapshot.app
     ```
+<img width="800" height="634" alt="2026-01-11_BetterTouchTool_16-03-19" src="https://github.com/user-attachments/assets/28b0ea15-e1b7-4fb6-9258-790e7a9c24a6" />
 
 ### Linux
 
