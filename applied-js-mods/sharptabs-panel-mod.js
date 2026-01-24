@@ -31,6 +31,11 @@
         COLLAPSED: "0px",
     };
 
+    // These short delays smooth out toolbar "active" flicker and DOM replacement races
+    // that can otherwise leave the toggle stuck in a blocked state while Sharp Tabs is open.
+    const INTERACTIVITY_RESYNC_DELAY_MS = 120;
+    const INACTIVE_CONFIRM_DELAY_MS = 200;
+
     const log = (context, message, ...args) => {
         // console.log(`[${context}] ${message}`, ...args);
     };
@@ -47,6 +52,8 @@
     let toggleButton = null;
     let toggleButtonId = null; // Track unique identifier for the button element
     let appElement = null;
+    // Track last blocked state to avoid resync loops when the toolbar is unstable.
+    let wasToggleBlocked = false;
 
     // Observers
     let toggleObserver = null;
@@ -54,6 +61,10 @@
 
     // Store the current click handler reference for cleanup
     let currentClickHandler = null;
+
+    // Resync timers
+    let interactivityResyncTimer = null;
+    let inactiveConfirmTimer = null;
 
     // CSS Classes for modes
     const MODE_CLASSES = {
@@ -159,10 +170,9 @@
             return;
         }
 
-        const styleElement = document.createElement("link");
+        const styleElement = document.createElement("style");
         styleElement.id = "vivaldi-sharptabs-mode-styles";
-        styleElement.rel = "stylesheet";
-        styleElement.href = "./sharptabs-panel-modes.css";
+        styleElement.textContent = MODE_STYLES_CSS;
         document.head.appendChild(styleElement);
 
         log("loadModeStyles", "Mode styles loaded successfully");
@@ -455,6 +465,49 @@
         updateToggleButtonInteractivity();
     }
 
+    // Re-check interactivity after a short delay in case .active or the toolbar button
+    // was applied/replaced after our first pass.
+    function scheduleInteractivityResync(reason, delay = INTERACTIVITY_RESYNC_DELAY_MS) {
+        if (interactivityResyncTimer) return;
+
+        interactivityResyncTimer = setTimeout(() => {
+            interactivityResyncTimer = null;
+            log("interactivityResync", "Re-running updateToggleButtonInteractivity", { reason });
+            updateToggleButtonInteractivity();
+        }, delay);
+    }
+
+    function cancelInactiveConfirmation(reason) {
+        if (!inactiveConfirmTimer) return;
+
+        clearTimeout(inactiveConfirmTimer);
+        inactiveConfirmTimer = null;
+        log("inactiveConfirm", "Cancelled pending INACTIVE confirmation", { reason });
+    }
+
+    // Avoid forcing INACTIVE on brief toolbar class drops; confirm after a short delay.
+    function scheduleInactiveConfirmation(reason) {
+        if (currentState === SIDEPANEL_STATES.INACTIVE) return;
+
+        if (inactiveConfirmTimer) {
+            clearTimeout(inactiveConfirmTimer);
+        }
+
+        inactiveConfirmTimer = setTimeout(() => {
+            inactiveConfirmTimer = null;
+            const isSharpTabsActive = !!getActiveSharpTabsButton();
+            const isActiveMode = currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED;
+
+            if (!isSharpTabsActive && isActiveMode) {
+                log("inactiveConfirm", "No active Sharp Tabs after delay - switching to INACTIVE", { reason });
+                setState(SIDEPANEL_STATES.INACTIVE);
+                updateToggleButtonInteractivity();
+            } else {
+                log("inactiveConfirm", "Active detected - skipping INACTIVE", { reason, isSharpTabsActive });
+            }
+        }, INACTIVE_CONFIRM_DELAY_MS);
+    }
+
     function updateToggleButtonInteractivity() {
         if (!toggleButton) return;
 
@@ -463,15 +516,25 @@
 
         log("updateToggleButtonInteractivity", "Updating button state", { isSharpTabsActive, currentState });
 
+        // Only block when we are truly inactive and Sharp Tabs is not active.
+        // A resync is scheduled the first time we enter blocked state to clear stale UI
+        // if the toolbar "active" class arrives slightly later.
+        const shouldBlock = isInactiveMode && !isSharpTabsActive;
+
         // Only show disabled state when in INACTIVE mode AND Sharp Tabs is not active
-        if (isInactiveMode && !isSharpTabsActive) {
+        if (shouldBlock) {
             // Button should appear disabled
             toggleButton.style.cssText = "-webkit-app-region: no-drag !important; cursor: not-allowed !important; pointer-events: auto !important; opacity: 0.5 !important;";
             toggleButton.setAttribute("title", "Activate the Sharp Tabs sidebar first");
+            if (!wasToggleBlocked) {
+                scheduleInteractivityResync("blocked-state");
+            }
+            wasToggleBlocked = true;
         } else {
             // Button should be interactive (either Sharp Tabs is active, or we're in HOVER/FIXED mode)
             toggleButton.style.cssText = "-webkit-app-region: no-drag !important; cursor: pointer !important; pointer-events: auto !important;";
             toggleButton.removeAttribute("title");
+            wasToggleBlocked = false;
         }
     }
 
@@ -499,9 +562,15 @@
         toolbarStateObserver = new MutationObserver((mutations) => {
             // Track if we handled a Sharp Tabs specific state change
             let handledSharpTabsChange = false;
+            let sawToolbarChildListChange = false;
 
             // First pass: Check for Sharp Tabs specific state changes
             mutations.forEach((mutation) => {
+                if (mutation.type === "childList") {
+                    sawToolbarChildListChange = true;
+                    return;
+                }
+
                 if (mutation.type === "attributes" && mutation.attributeName === "class") {
                     const target = mutation.target;
 
@@ -535,31 +604,47 @@
                     // Update toggle button interactivity based on Sharp Tabs state
                     updateToggleButtonInteractivity();
 
-                    // If panel became inactive (lost active class)
+                    // If panel became inactive (lost active class), confirm before switching
                     if (!isActive && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
-                        log("setupToolbarStateObserver", "Sharp Tabs deactivated - switching to INACTIVE mode");
-                        setState(SIDEPANEL_STATES.INACTIVE);
+                        log("setupToolbarStateObserver", "Sharp Tabs deactivated - scheduling INACTIVE confirmation");
+                        if (!previousState) {
+                            previousState = currentState;
+                        }
+                        scheduleInactiveConfirmation("sharp-tabs-deactivated");
                     }
                     // If panel became active again (gained active class)
-                    else if (isActive && currentState === SIDEPANEL_STATES.INACTIVE) {
-                        log("setupToolbarStateObserver", "Sharp Tabs activated - restoring mode:", lastActiveMode);
-                        setState(lastActiveMode);
+                    else if (isActive) {
+                        cancelInactiveConfirmation("sharp-tabs-activated");
+                        if (currentState === SIDEPANEL_STATES.INACTIVE) {
+                            log("setupToolbarStateObserver", "Sharp Tabs activated - restoring mode:", lastActiveMode);
+                            setState(lastActiveMode);
+                        }
                     }
                 }
             });
+
+            if (sawToolbarChildListChange) {
+                // Toolbar nodes can be replaced without class mutations; resync to keep
+                // the toggle icon/interactivity correct when Sharp Tabs is still open.
+                log("setupToolbarStateObserver", "Toolbar structure changed - resyncing interactivity");
+                updateToggleButtonInteractivity();
+                scheduleInteractivityResync("toolbar-childList");
+
+                if (getActiveSharpTabsButton()) {
+                    cancelInactiveConfirmation("toolbar-childList-active");
+                }
+            }
 
             // Second pass: If no Sharp Tabs change, check for general "no active buttons" condition
             if (!handledSharpTabsChange) {
                 const hasActiveButton = toolbarElement.querySelector(SELECTORS.ACTIVE_BUTTON);
 
                 if (!hasActiveButton && (currentState === SIDEPANEL_STATES.HOVER || currentState === SIDEPANEL_STATES.FIXED)) {
-                    log("setupToolbarStateObserver", "No active buttons detected in HOVER/FIXED mode, switching to INACTIVE");
-
+                    log("setupToolbarStateObserver", "No active buttons detected in HOVER/FIXED mode, scheduling INACTIVE confirmation");
                     if (!previousState) {
                         previousState = currentState;
                     }
-                    setState(SIDEPANEL_STATES.INACTIVE);
-                    updateToggleButtonInteractivity();
+                    scheduleInactiveConfirmation("no-active-buttons");
                 }
             }
         });
@@ -699,4 +784,146 @@
             }, 7000);
         }
     }, 800);
+
+
+    const MODE_STYLES_CSS = `
+/* Version v1.2 - 2025-11-23 */
+/* 1.2: Fixed full screen youtube videos having a line on the left side of the video */
+
+/*
+    ============================================
+        SHARPTABS PANEL MODES
+        Combined CSS for Fixed and Hover modes
+    ============================================
+*/
+
+#app #browser:is(.normal, .maximized) #switch {
+    will-change: flex-basis, opacity, width;
+    transition: flex-basis 0.3s ease-in-out, opacity 0.3s ease-in-out, width 0.3s ease-in-out !important;
+}
+
+#webview-container {
+    will-change: padding-left;
+    transition: padding-left 0.13s ease-in-out !important;
+}
+
+#app #browser:is(.normal, .maximized) #panels-container {
+    will-change: width;
+    height: 100%;
+}
+
+/* ============================= FIXED MODE ============================================ */
+/* This mode hides Vivaldi's panel's bar and just keeps the SharpTabs extension shown */
+/* It also sets the side bar to be narrower than the minimum default allowed value of 260px */
+
+#app.sharptabs-fixed-mode {
+    --width-full: 220px;
+    --width-minimized: 77px;
+    --width-hovered: 220px;
+    --animation-speed: 0.2s;
+    --transition-web-panel: transform var(--animation-speed) ease-in-out, width var(--animation-speed) ease-in-out;
+
+    /* IMPORTANT: Incase you face any issues with the panel placement
+    then adjust these values like shown in the video: */
+    --shift-vivaldi-panel-bar-left: 0px;
+    --shift-vivaldi-page: 200px;
+}
+
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #switch {
+    width: 0 !important;
+    flex-basis: 0 !important;
+    opacity: 0 !important;
+}
+
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #main.left .panel-group .panel-collapse-guard {
+    min-width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Adjust this to set the panel width when in "fixed mode" (square icon shown) */
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #panels-container {
+    position: absolute !important;
+    /* Static panel width, comment if 260px minimum + resizing + hidden vivaldi panels bar is desired */
+    width: 200px !important;
+    transform: translateX(calc(100% + var(--shift-vivaldi-panel-bar-left-expanded)));
+    height: 100%;
+}
+
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #webview-container {
+    padding-left: var(--shift-vivaldi-page) !important;
+}
+
+/* Hide the resize handle + comment if 260px minimum + resizing is desired */
+#app.sharptabs-fixed-mode #browser:is(.normal, .maximized) #panels-container > button.SlideBar--FullHeight {
+    display: none;
+}
+
+/* ============================= HOVER MODE ============================================ */
+/* This mode collaapses the panel on the left side showing only the icons of each tab */
+/* The panel expands when you hover. You'll see a circle icon in the Sharp Tabs mode button */
+
+#app.sharptabs-hover-mode {
+    --width-full: 220px;
+    --width-minimized: 77px;
+    --width-hovered: 220px;
+
+    /* IMPORTANT: Incase you face any issues with the panel placement
+    then adjust these values like shown in the video: */
+    --shift-vivaldi-panel-bar-left-collapsed: 0px;
+    --shift-vivaldi-panel-bar-left-expanded: 39px;
+    --shift-vivaldi-page: 39px;
+}
+
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized).density-on {
+    --shift-vivaldi-panel-bar-left-collapsed: 0px !important;
+    --shift-vivaldi-panel-bar-left-expanded: 38px !important;
+    --shift-vivaldi-page: 38px !important;
+}
+
+/* When the panel hover mode is active, hide the panel's buttons */
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #switch {
+    width: 0 !important;
+    flex-basis: 0 !important;
+    opacity: 0 !important;
+}
+
+/* Uncomment the following code if you want to keep the panel buttons when you hover over the collapsed sidebar: */
+/*
+    #app.sharptabs-hover-mode:not(:hover) #switch {
+        width: 0 !important;
+        flex-basis: 0 !important;
+        opacity: 0 !important;
+    }
+*/
+
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container {
+    position: absolute !important;
+    will-change: width;
+    width: var(--width-minimized) !important;
+    transform: translateX(calc(-100% + var(--shift-vivaldi-panel-bar-left-expanded)));
+    transition: transform 0.2s ease-in-out, width 0.2s ease-in-out !important;
+}
+
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) .panel-collapse-guard {
+    min-width: var(--width-minimized) !important;
+    max-width: var(--width-hovered) !important;
+}
+
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container:hover {
+    width: var(--width-hovered) !important;
+    transform: translateX(var(--shift-vivaldi-panel-bar-left-collapsed));
+}
+
+/* shift page to the right (confirmed) */
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #webview-container {
+    padding-left: var(--shift-vivaldi-page) !important;
+}
+
+/* Make the side panel not resizeable in overlay mode */
+/* Makes cursor not change when hovering side panel */
+#app.sharptabs-hover-mode #browser:is(.normal, .maximized) #panels-container > button.SlideBar--FullHeight {
+    display: none;
+}
+/*# sourceURL=sharptabs-panel-modes.css */
+`;
 })();
